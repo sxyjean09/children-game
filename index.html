@@ -917,37 +917,149 @@
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
 
-  // ============ 语音队列：串行播放，绝不重叠 ============
+  // ============ 语音系统（多端兑底） ============
   const _ttsQueue = [];
   let _ttsPlaying = false;
+  let _ttsBroken = false;  // 安卓/某些浏览器上 TTS 不响，检测后为 true
+  let _ttsFailCount = 0;   // 连续失败计数
 
   function _ttsPlayNext() {
     if (_ttsPlaying || _ttsQueue.length === 0) return;
+    if (_ttsBroken) {
+      // TTS 不工作，直接出队、合成音效
+      const item = _ttsQueue.shift();
+      _playSFX(item);
+      return;
+    }
     const item = _ttsQueue.shift();
     _ttsPlaying = true;
+    let started = false;
     const utter = new SpeechSynthesisUtterance(item.text);
     utter.lang = item.lang || 'zh-CN';
     if (_zhVoice) utter.voice = _zhVoice;
     utter.rate = item.rate || 1.1;
     utter.pitch = item.pitch || 1.3;
     utter.volume = 1.0;
-    utter.onend = () => { _ttsPlaying = false; _ttsPlayNext(); };
-    utter.onerror = () => { _ttsPlaying = false; _ttsPlayNext(); };
-    try { window.speechSynthesis.speak(utter); } catch(e) { _ttsPlaying = false; _ttsPlayNext(); }
+    // 限时：onstart 超过 2s 没触发就认为 TTS 坏了
+    const failTimer = setTimeout(() => {
+      if (!started) {
+        _ttsFailCount++;
+        if (_ttsFailCount >= 2) { _ttsBroken = true; }
+        _ttsPlaying = false;
+        _ttsPlayNext();
+      }
+    }, 2000);
+    utter.onstart = () => { started = true; clearTimeout(failTimer); };
+    utter.onend = () => { _ttsPlaying = false; _ttsFailCount = 0; _ttsPlayNext(); };
+    utter.onerror = () => {
+      _ttsFailCount++;
+      if (_ttsFailCount >= 2) { _ttsBroken = true; }
+      clearTimeout(failTimer);
+      _ttsPlaying = false;
+      _ttsPlayNext();
+    };
+    try {
+      window.speechSynthesis.speak(utter);
+    } catch(e) {
+      clearTimeout(failTimer);
+      _ttsFailCount++;
+      if (_ttsFailCount >= 2) { _ttsBroken = true; }
+      _ttsPlaying = false;
+      _ttsPlayNext();
+    }
+  }
+
+  // Web Audio 音效兑底：在没有 TTS 的设备上用纯音频合成发音反馈
+  let _audioCtx = null;
+  function _getAudioCtx() {
+    if (!_audioCtx) {
+      try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e) { _audioCtx = null; }
+    }
+    return _audioCtx;
+  }
+  function _playSFX(item) {
+    const ctx = _getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    if (item.kind === 'letter') {
+      // 字母：用不同频率的“叮”区分
+      const letter = (item.text || 'A').toUpperCase();
+      const freq = 440 + (letter.charCodeAt(0) - 65) * 25;  // A=440Hz, B=465...
+      _tone(ctx, now, freq, 0.18, 'sine', 0.4);
+    } else if (item.kind === 'praise') {
+      // 鼓励语：两个上升的“叮咚”
+      _tone(ctx, now, 523, 0.12, 'sine', 0.35);          // C5
+      _tone(ctx, now + 0.13, 659, 0.18, 'sine', 0.4);    // E5
+    } else if (item.kind === 'finale') {
+      // 最终胜利：三音上行
+      _tone(ctx, now, 523, 0.12, 'sine', 0.4);
+      _tone(ctx, now + 0.13, 659, 0.12, 'sine', 0.4);
+      _tone(ctx, now + 0.26, 784, 0.25, 'sine', 0.45);   // G5
+    } else if (item.kind === 'depart') {
+      // 出发：口哨音（高频滑动）
+      _whistle(ctx, now, 0.5, 0.35);
+    } else {
+      _tone(ctx, now, 523, 0.15, 'sine', 0.35);
+    }
+    // 音效不计入队列，直接异步，不阻塞下一条 TTS
+  }
+  function _tone(ctx, when, freq, dur, type, vol) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(vol, when + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when + dur + 0.05);
+  }
+  function _whistle(ctx, when, dur, vol) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, when);
+    osc.frequency.exponentialRampToValueAtTime(1200, when + dur);
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(vol, when + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when + dur + 0.05);
   }
 
   function speak(text, opts) {
-    if (!soundOn || !('speechSynthesis' in window)) return;
+    if (!soundOn) return;
     opts = opts || {};
-    _ttsQueue.push({ text, lang: 'zh-CN', rate: opts.rate || 1.1, pitch: opts.pitch || 1.3 });
+    const item = { text, lang: 'zh-CN', rate: opts.rate || 1.1, pitch: opts.pitch || 1.3, kind: 'praise' };
+    _ttsQueue.push(item);
     _ttsPlayNext();
   }
 
   // 字母发音：只念字母名一次，不念“大写”前缀。
-  // iOS 中文 TTS 收到单个大写字母会先说“大写”，所以用小写字母 + en-US 避免。
   function speakLetter(letter) {
-    if (!soundOn || !('speechSynthesis' in window)) return;
-    _ttsQueue.push({ text: letter.toLowerCase(), lang: 'en-US', rate: 0.9, pitch: 1.3 });
+    if (!soundOn) return;
+    const item = { text: letter.toLowerCase(), lang: 'en-US', rate: 0.9, pitch: 1.3, kind: 'letter' };
+    _ttsQueue.push(item);
+    _ttsPlayNext();
+  }
+
+  // 最终关卡语音
+  function speakFinale(text) {
+    if (!soundOn) return;
+    _ttsQueue.push({ text, lang: 'zh-CN', rate: 1.0, pitch: 1.4, kind: 'finale' });
+    _ttsPlayNext();
+  }
+
+  // 出发语音
+  function speakDepart(text) {
+    if (!soundOn) return;
+    _ttsQueue.push({ text, lang: 'zh-CN', rate: 1.2, pitch: 1.5, kind: 'depart' });
     _ttsPlayNext();
   }
 
@@ -999,7 +1111,7 @@
       hint.classList.add('success');
       // 等鼓励语说完再念出发
       const finalDelay = speakDuration(praiseText, 1.1) + 300;
-      setTimeout(() => speak('小火车出发啦！', { pitch: 1.5, rate: 1.2 }), finalDelay);
+      setTimeout(() => speakDepart('小火车出发啦！'), finalDelay);
       const startTrainDelay = finalDelay + speakDuration('小火车出发啦！', 1.2) + 200;
       setTimeout(() => {
         hint.classList.remove('success');
@@ -1126,7 +1238,7 @@
     pool.style.transition = 'opacity 0.5s';
     hint.classList.add('success');
     hint.innerHTML = '🎉 A B C D ... Z！字母火车出发啦！';
-    setTimeout(() => speak('太棒啦！二十六个字母全部拼好啦！字母火车出发！', { pitch: 1.4, rate: 1.0 }), 500);
+    setTimeout(() => speakFinale('太棒啦！二十六个字母全部拼好啦！字母火车出发！'), 500);
     levelBadge.style.opacity = '0';
     // 构建 26 节全字母火车
     train.innerHTML = '';
