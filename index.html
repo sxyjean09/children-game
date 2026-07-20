@@ -636,13 +636,39 @@
     if (soundOn) {
       soundToggle.textContent = '🔊 声音';
       soundToggle.classList.remove('muted');
-      speak('声音打开啦');
+      // 主动探测 TTS：如果 1.5s 内 TTS 不响应，立刻 fallback 到音效兑底
+      _probeTTS();
     } else {
       soundToggle.textContent = '🔇 静音';
       soundToggle.classList.add('muted');
       try { window.speechSynthesis.cancel(); } catch(e) {}
     }
   });
+
+  // 首次探测 TTS 是否能用：超时 1.5s 未 onstart 则标为 broken
+  function _probeTTS() {
+    if (!('speechSynthesis' in window)) { _ttsBroken = true; return; }
+    let started = false;
+    const probe = new SpeechSynthesisUtterance(' ');
+    probe.volume = 0;  // 探测不发声
+    probe.onstart = () => { started = true; };
+    const timer = setTimeout(() => {
+      if (!started) {
+        _ttsBroken = true;
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+      }
+    }, 1500);
+    try {
+      window.speechSynthesis.speak(probe);
+      // 成功后重置标志
+      probe.onend = () => clearTimeout(timer);
+    } catch(e) {
+      _ttsBroken = true;
+      clearTimeout(timer);
+    }
+  }
+  // 页面加载后 1s 主动探测一次（不需用户交互也能探测）
+  setTimeout(_probeTTS, 1000);
 
   // ============ 初始化关卡 ============
   function setupLevel(animate) {
@@ -867,6 +893,10 @@
 
   function flyToTrain(piece) {
     busy = true;
+    // 保底：万一 attachToTrain 没走到，1500ms 后强行解锁
+    const _failsafe = setTimeout(() => { busy = false; }, 1500);
+    // 成功路径会重写 _failsafe 后续逻辑，但为了避免冲突，下面给个解除
+    piece._failsafe = _failsafe;
     piece.classList.remove('highlight');
     const fromRect = piece.getBoundingClientRect();
     piece.style.position = 'fixed';
@@ -884,6 +914,7 @@
       piece.style.top = targetTop + 'px';
     });
     setTimeout(() => {
+      clearTimeout(piece._failsafe);
       piece.classList.remove('flying');
       piece.remove();
       attachToTrain(expectedIdx);
@@ -922,16 +953,32 @@
   let _ttsPlaying = false;
   let _ttsBroken = false;  // 安卓/某些浏览器上 TTS 不响，检测后为 true
   let _ttsFailCount = 0;   // 连续失败计数
+  let _sfxBusy = false;    // 音效播放中（动画性 mutex）
+
+  function _sfxDuration(item) {
+    if (item.kind === 'letter') return 250;
+    if (item.kind === 'praise') return 350;
+    if (item.kind === 'finale') return 450;
+    if (item.kind === 'depart') return 600;
+    return 300;
+  }
 
   function _ttsPlayNext() {
-    if (_ttsPlaying || _ttsQueue.length === 0) return;
+    if (_ttsQueue.length === 0) return;
+    // 纯 SFX 兑底模式：顺序出队 + 等动画时长后播下一条
     if (_ttsBroken) {
-      // TTS 不工作，直接出队、合成音效
+      if (_sfxBusy) return;
       const item = _ttsQueue.shift();
+      if (!item) return;
+      _sfxBusy = true;
       _playSFX(item);
+      const dur = _sfxDuration(item);
+      setTimeout(() => { _sfxBusy = false; _ttsPlayNext(); }, dur + 50);
       return;
     }
+    if (_ttsPlaying) return;
     const item = _ttsQueue.shift();
+    if (!item) return;
     _ttsPlaying = true;
     let started = false;
     const utter = new SpeechSynthesisUtterance(item.text);
@@ -1105,7 +1152,7 @@
         updateHint();
         highlightExpected();
         busy = false;
-      }, 700);
+      }, 400);
     } else {
       hint.textContent = '🎉 全部接好啦！';
       hint.classList.add('success');
