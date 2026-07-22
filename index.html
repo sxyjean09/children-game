@@ -49,6 +49,100 @@
     to { transform: translateX(130vw); }
   }
 
+  /* 飞机：纯 CSS 画，左→右飞 */
+  .airplane {
+    position: absolute;
+    width: 50px; height: 18px;
+    top: 90px;
+    left: -10%;
+    animation: drift 50s linear infinite;
+    z-index: 2;
+  }
+  .airplane .body {
+    position: absolute;
+    width: 50px; height: 14px;
+    top: 2px;
+    background: linear-gradient(180deg, #fff 0%, #cfd8dc 100%);
+    border: 2px solid #455a64;
+    border-radius: 14px 14px 4px 4px;
+  }
+  .airplane .body::before {
+    content: ""; position: absolute;
+    top: -8px; left: 12px;
+    width: 22px; height: 10px;
+    background: #eceff1;
+    border: 2px solid #455a64;
+    border-radius: 8px 8px 0 0;
+    transform: skewX(-20deg);
+  }
+  .airplane .body::after {
+    content: ""; position: absolute;
+    top: 4px; right: -10px;
+    width: 14px; height: 6px;
+    background: #b71c1c;
+    border: 2px solid #455a64;
+    border-radius: 2px 6px 6px 2px;
+    transform: skewY(-10deg);
+  }
+  .airplane .wing {
+    position: absolute;
+    top: 8px; left: 14px;
+    width: 24px; height: 6px;
+    background: #90a4ae;
+    border: 2px solid #455a64;
+    border-radius: 4px 12px 4px 4px;
+    transform: rotate(15deg);
+  }
+  .airplane .window {
+    position: absolute;
+    top: 5px; left: 8px;
+    width: 30px; height: 3px;
+    background: #1976d2;
+    border-radius: 2px;
+    box-shadow: 4px 0 0 #1976d2, 8px 0 0 #1976d2, 16px 0 0 #1976d2;
+  }
+
+  /* 小鸟：纯 CSS 画，翅膀拍动 */
+  .bird {
+    position: absolute;
+    left: -5%;
+    width: 30px; height: 18px;
+    z-index: 2;
+  }
+  .bird .body {
+    position: absolute;
+    top: 8px; left: 0;
+    width: 22px; height: 8px;
+    background: #5d4037;
+    border-radius: 14px 14px 4px 4px;
+    transform: scaleX(-1) rotate(5deg);
+  }
+  .bird .body::after {
+    content: ""; position: absolute;
+    top: 1px; left: -4px;
+    width: 8px; height: 5px;
+    background: #ff8a65;
+    border-radius: 4px 0 0 4px;
+  }
+  .bird .wing-l, .bird .wing-r {
+    position: absolute;
+    top: 2px;
+    width: 18px; height: 12px;
+    background: #6d4c41;
+    border-radius: 50% 50% 0 50%;
+    transform-origin: bottom center;
+    animation: flap 0.5s ease-in-out infinite;
+  }
+  .bird .wing-l { left: 0; transform: rotate(-30deg); }
+  .bird .wing-r { right: 0; transform-origin: bottom left; animation-delay: 0.25s; }
+  @keyframes flap {
+    0%, 100% { transform: rotate(-30deg) scaleY(1); }
+    50%      { transform: rotate(20deg) scaleY(0.5); }
+  }
+  .bird1 { top: 100px; animation: drift 30s linear infinite; }
+  .bird2 { top: 180px; animation: drift 45s linear infinite; animation-delay: -15s; }
+  .bird3 { top: 220px; animation: drift 38s linear infinite; animation-delay: -25s; }
+
   .title {
     position: absolute; top: 20px; left: 50%;
     transform: translateX(-50%);
@@ -465,18 +559,38 @@
   .sound-toggle.muted { opacity: 0.6; }
 
   .reset {
-    position: absolute; bottom: 20px; right: 20px;
-    padding: 14px 22px;
+    position: absolute; top: 20px; right: 20px;
+    padding: 10px 16px;
     background: #fff;
     border: 3px solid #5d4037;
     border-radius: 30px;
-    font-size: 18px; font-weight: 700;
+    font-size: 16px; font-weight: 700;
     color: #5d4037;
     cursor: pointer;
     box-shadow: 0 4px 0 #5d4037, 0 6px 12px rgba(0,0,0,0.2);
     z-index: 20;
   }
   .reset:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
+
+  /* 提示开关按钮（右上角，挨着重玩按钮左边） */
+  .hint-toggle {
+    position: absolute; top: 20px; right: 120px;
+    padding: 10px 16px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 30px;
+    font-size: 16px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #5d4037, 0 6px 12px rgba(0,0,0,0.2);
+    z-index: 20;
+    opacity: 0.6;
+  }
+  .hint-toggle:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
+  .hint-toggle.on { opacity: 1; background: #fff59d; }
+
+  /* 提示默认隐藏，打开开关才显示 */
+  .hint.hidden { visibility: hidden; }
 
   /* 出场扬尘 */
   .dust {
@@ -541,11 +655,15 @@
   <div class="sun"></div>
   <div class="cloud cloud1"></div>
   <div class="cloud cloud2"></div>
+  <div class="airplane"><div class="body"></div><div class="wing"></div><div class="window"></div></div>
+  <div class="bird bird1"><div class="wing-l"></div><div class="body"></div><div class="wing-r"></div></div>
+  <div class="bird bird2"><div class="wing-l"></div><div class="body"></div><div class="wing-r"></div></div>
+  <div class="bird bird3"><div class="wing-l"></div><div class="body"></div><div class="wing-r"></div></div>
   <div class="title">🚂 小火车拼字母</div>
   <div class="level-badge" id="levelBadge">第 <span id="levelNum">1</span> 关<span class="progress" id="progress"></span></div>
 
   <div class="stage">
-    <div class="hint" id="hint">点击正确的字母让车厢飞过去～</div>
+    <div class="hint hidden" id="hint">点击正确的字母让车厢飞过去～</div>
 
     <div class="rail-area" id="railArea">
       <div class="ties"></div>
@@ -571,6 +689,8 @@
   </div>
 
   <button class="sound-toggle" id="soundToggle">🔊 声音</button>
+
+  <button class="hint-toggle" id="hintToggle">💡 提示</button>
 
   <button class="reset" id="reset">🔄 重玩</button>
 
@@ -627,6 +747,22 @@
       btn.classList.add('active');
       mode = btn.dataset.mode;
     });
+  });
+
+  // 提示开关
+  let hintOn = false;
+  const hintToggle = document.getElementById('hintToggle');
+  hintToggle.addEventListener('click', () => {
+    hintOn = !hintOn;
+    hintToggle.classList.toggle('on', hintOn);
+    if (hintOn) {
+      hint.classList.remove('hidden');
+      updateHint();
+      highlightExpected();
+    } else {
+      hint.classList.add('hidden');
+      pool.querySelectorAll('.piece.highlight').forEach(p => p.classList.remove('highlight'));
+    }
   });
 
   // 声音开关
@@ -875,7 +1011,7 @@
     const expected = levels[levelIdx].toAdd[expectedIdx];
     if (!expected) return;
     const target = pool.querySelector(`.piece[data-letter="${expected}"]`);
-    if (target) target.classList.add('highlight');
+    if (target && hintOn) target.classList.add('highlight');
   }
 
   // ============ 点击模式 ============
@@ -1380,13 +1516,21 @@
   reset.addEventListener('click', () => {
     // 停止 finale 循环
     if (_loopTimer) { clearInterval(_loopTimer); _loopTimer = null; }
+    if (window._stopFinale) { window._stopFinale(); window._stopFinale = null; }
+    // 清掉所有残留动画元素（庆祝星星、速度线、扬尘、字母气泡）
+    document.querySelectorAll('.star, .speedline, .dust, .letter-bubble').forEach(el => el.remove());
     train.classList.remove('running');
     train.style.transition = 'none';
+    train.style.left = '';
+    train.style.transform = '';
     pool.style.opacity = '';
     pool.style.transition = '';
+    pool.style.display = '';
     levelBadge.style.opacity = '';
     hint.classList.remove('success');
     reset.textContent = '🔄 重玩';
+    expectedIdx = 0;
+    filledCount = 0;
     levelIdx = 0;
     setupLevel();
     enterTrain();
@@ -1395,8 +1539,14 @@
   // ============ 辅助 ============
   function pickDistractors(needed, count) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const set = new Set(needed);
-    const free = alphabet.filter(c => !set.has(c));
+    // 排除：needed 本身 + needed 的相邻字母（避免出现连续字母选项）
+    const excluded = new Set(needed);
+    needed.forEach(c => {
+      const code = c.charCodeAt(0);
+      if (code - 1 >= 'A'.charCodeAt(0)) excluded.add(String.fromCharCode(code - 1));
+      if (code + 1 <= 'Z'.charCodeAt(0)) excluded.add(String.fromCharCode(code + 1));
+    });
+    const free = alphabet.filter(c => !excluded.has(c));
     shuffle(free);
     return free.slice(0, count);
   }
