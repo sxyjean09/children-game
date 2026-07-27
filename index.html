@@ -572,6 +572,125 @@
   }
   .reset:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
 
+  /* 关卡选择按钮 */
+  .level-picker-btn {
+    position: absolute; top: 20px; left: 130px;
+    padding: 10px 16px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 30px;
+    font-size: 16px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #5d4037, 0 6px 12px rgba(0,0,0,0.2);
+    z-index: 20;
+  }
+  .level-picker-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
+
+  /* 关卡选择弹窗 */
+  .level-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .level-modal.show { display: flex; }
+  .level-modal .panel {
+    background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 100%);
+    border: 5px solid #5d4037;
+    border-radius: 24px;
+    padding: 24px;
+    max-width: 480px; width: 100%;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .level-modal h2 {
+    margin: 0 0 6px;
+    font-size: 26px; color: #5d4037;
+    text-align: center;
+  }
+  .level-modal .sub {
+    text-align: center;
+    color: #8d6e63;
+    font-size: 14px; margin-bottom: 16px;
+  }
+  .level-modal .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .level-cell {
+    aspect-ratio: 1 / 1;
+    border: 3px solid #5d4037;
+    border-radius: 14px;
+    background: #fff;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s;
+    position: relative;
+    box-shadow: 0 3px 0 #5d4037;
+  }
+  .level-cell:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
+  .level-cell .num {
+    font-size: 12px; color: #8d6e63; font-weight: 700;
+  }
+  .level-cell .letter {
+    font-size: 28px; font-weight: 900; color: #d35400;
+    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+  }
+  .level-cell.completed {
+    background: linear-gradient(180deg, #a5d6a7 0%, #66bb6a 100%);
+  }
+  .level-cell.completed .letter { color: #1b5e20; }
+  .level-cell.completed::after {
+    content: "✓"; position: absolute; top: 2px; right: 6px;
+    font-size: 14px; color: #fff; font-weight: 900;
+    background: #2e7d32; width: 18px; height: 18px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .level-cell.current {
+    background: linear-gradient(180deg, #fff59d 0%, #ff7043 100%);
+    border-color: #bf360c;
+    animation: cell-glow 1.5s ease-in-out infinite;
+  }
+  @keyframes cell-glow {
+    0%, 100% { box-shadow: 0 3px 0 #bf360c, 0 0 0 0 rgba(255, 112, 67, 0.6); }
+    50%      { box-shadow: 0 3px 0 #bf360c, 0 0 0 10px rgba(255, 112, 67, 0); }
+  }
+  .level-cell.finale {
+    background: linear-gradient(180deg, #ce93d8 0%, #8e24aa 100%);
+    border-color: #4a148c;
+  }
+  .level-cell.finale .letter { color: #fff; text-shadow: 1px 1px 0 #4a148c; }
+  .level-cell .star {
+    font-size: 10px; color: #8d6e63;
+  }
+  .level-modal .actions {
+    display: flex; gap: 10px; justify-content: center;
+  }
+  .level-modal button.secondary {
+    padding: 10px 18px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 20px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #5d4037;
+  }
+  .level-modal button.secondary:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
+  .level-modal button.danger {
+    background: #ffcdd2;
+    border-color: #b71c1c;
+    color: #b71c1c;
+  }
+
   /* 提示开关按钮（右上角，挨着重玩按钮左边） */
   .hint-toggle {
     position: absolute; top: 20px; right: 120px;
@@ -692,6 +811,20 @@
   <button class="hint-toggle" id="hintToggle">💡 提示</button>
 
   <button class="reset" id="reset">🔄 重玩</button>
+  <button class="level-picker-btn" id="levelPickerBtn">📋 关卡</button>
+
+  <!-- 关卡选择弹窗 -->
+  <div class="level-modal" id="levelModal">
+    <div class="panel">
+      <h2>🚂 选一关开始</h2>
+      <div class="sub">绿色 = 已通关 · 橙色 = 当前关 · 紫色 = 最终彩蛋</div>
+      <div class="grid" id="levelGrid"></div>
+      <div class="actions">
+        <button class="secondary danger" id="resetProgress">🗑 清空进度</button>
+        <button class="secondary" id="closeLevelModal">关 闭</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 (function() {
@@ -737,6 +870,103 @@
   let filledCount = 0;
   let mode = 'tap';
   let busy = false;
+
+  // ============ 关卡进度（localStorage 持久化）============
+  const STORAGE_KEY = 'train-letter-game-progress-v1';
+  // 存 { completed: [true, false, ...], unlocked: 关卡数（顺序通关时 = completed.length + 1，可跳关任意关） }
+  // 这里采用"自由选关"模式：所有关卡都可点，进度仅用来标记"已通关"
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { completed: new Array(levels.length).fill(false) };
+      const obj = JSON.parse(raw);
+      if (!obj.completed || obj.completed.length !== levels.length) {
+        return { completed: new Array(levels.length).fill(false) };
+      }
+      return { completed: obj.completed };
+    } catch(e) {
+      return { completed: new Array(levels.length).fill(false) };
+    }
+  }
+  function saveProgress() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: progress.completed })); }
+    catch(e) {}
+  }
+  let progress = loadProgress();
+  function isCompleted(idx) { return !!progress.completed[idx]; }
+  function markCompleted(idx) { progress.completed[idx] = true; saveProgress(); }
+
+  // 弹出关卡选择器
+  const levelPickerBtn = document.getElementById('levelPickerBtn');
+  const levelModal = document.getElementById('levelModal');
+  const levelGrid = document.getElementById('levelGrid');
+  const closeLevelModalBtn = document.getElementById('closeLevelModal');
+  const resetProgressBtn = document.getElementById('resetProgress');
+
+  function openLevelModal() {
+    levelGrid.innerHTML = '';
+    for (let i = 0; i < levels.length; i++) {
+      const lv = levels[i];
+      const cell = document.createElement('div');
+      cell.className = 'level-cell';
+      if (isCompleted(i)) cell.classList.add('completed');
+      if (i === levelIdx) cell.classList.add('current');
+      if (i === levels.length - 1) cell.classList.add('finale');
+      cell.innerHTML = `
+        <div class="num">第 ${i + 1} 关</div>
+        <div class="letter">${lv.head}</div>
+        <div class="star">${'★'.repeat(3)}</div>
+      `;
+      cell.addEventListener('click', () => {
+        jumpToLevel(i);
+        closeLevelModal();
+      });
+      levelGrid.appendChild(cell);
+    }
+    levelModal.classList.add('show');
+  }
+  function closeLevelModal() { levelModal.classList.remove('show'); }
+
+  levelPickerBtn.addEventListener('click', () => {
+    if (busy && _loopTimer) return;  // 彩蛋中允许打开（玩家想从头来）
+    openLevelModal();
+  });
+  closeLevelModalBtn.addEventListener('click', closeLevelModal);
+  levelModal.addEventListener('click', (e) => {
+    if (e.target === levelModal) closeLevelModal();
+  });
+  resetProgressBtn.addEventListener('click', () => {
+    if (!confirm('确定要清空所有通关记录吗？')) return;
+    progress = { completed: new Array(levels.length).fill(false) };
+    saveProgress();
+    openLevelModal();  // 刷新网格显示
+  });
+
+  // 跳转到指定关卡
+  function jumpToLevel(idx) {
+    if (idx < 0 || idx >= levels.length) return;
+    // 清理当前动画
+    if (_loopTimer) { clearInterval(_loopTimer); _loopTimer = null; }
+    if (window._stopFinale) { window._stopFinale(); window._stopFinale = null; }
+    document.querySelectorAll('.star, .speedline, .dust, .letter-bubble').forEach(el => el.remove());
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+    train.classList.remove('running');
+    train.style.transition = 'none';
+    train.style.left = '';
+    train.style.transform = '';
+    pool.style.opacity = '';
+    pool.style.transition = '';
+    pool.style.display = '';
+    levelBadge.style.opacity = '';
+    hint.classList.remove('success');
+    reset.textContent = '🔄 重玩';
+
+    levelIdx = idx;
+    expectedIdx = 0;
+    filledCount = 0;
+    setupLevel();
+    enterTrain();
+  }
 
   // ============ 模式切换 ============
   modeToggle.querySelectorAll('button').forEach(btn => {
@@ -1276,6 +1506,7 @@
 
     expectedIdx++;
     filledCount++;
+    markCompleted(levelIdx);  // 每拼上一节就标记"本关通关"
     updateProgress();
 
     if (filledCount < levels[levelIdx].toAdd.length) {
