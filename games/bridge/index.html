@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>小车过字母桥</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #87ceeb 0%, #b0e0e6 60%, #90ee90 60%, #7ccd7c 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    touch-action: manipulation;
+  }
+
+  .back {
+    position: absolute; top: 16px; left: 16px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 24px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    text-decoration: none;
+    box-shadow: 0 3px 0 #5d4037;
+    z-index: 50;
+  }
+  .back:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
+
+  .sound-toggle {
+    position: absolute; top: 16px; right: 16px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 24px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #5d4037;
+    z-index: 50;
+  }
+
+  .title {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 22px; font-weight: 900;
+    color: #fff;
+    text-shadow: 2px 2px 0 #5b8cbe;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  /* 提示条 */
+  .prompt {
+    position: absolute;
+    top: 56px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    padding: 10px 20px;
+    border-radius: 22px;
+    border: 3px solid #5d4037;
+    font-size: 16px; font-weight: 900;
+    color: #5d4037;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .prompt .target {
+    display: inline-block;
+    margin: 0 4px;
+    padding: 2px 12px;
+    background: #ff7043;
+    color: white;
+    border-radius: 10px;
+    text-shadow: none;
+    animation: hint-pulse 1s ease-in-out infinite;
+  }
+  @keyframes hint-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+  }
+
+  /* 场景：小车 + 桥 */
+  .scene {
+    position: absolute;
+    top: 110px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+  }
+
+  /* 桥 */
+  .bridge {
+    position: absolute;
+    bottom: 130px; left: 10%;
+    width: 80%; height: 100px;
+    background: linear-gradient(180deg, #bcaaa4 0%, #8d6e63 70%, #5d4037 100%);
+    border: 4px solid #5d4037;
+    border-radius: 8px;
+    box-shadow: 0 6px 0 #3e2723, 0 10px 16px rgba(0,0,0,0.3);
+  }
+  .bridge::before {
+    /* 桥上栏杆 */
+    content: "";
+    position: absolute;
+    top: -8px; left: 0; right: 0;
+    height: 8px;
+    background: repeating-linear-gradient(90deg, #5d4037 0, #5d4037 18px, transparent 18px, transparent 36px);
+  }
+  .bridge::after {
+    /* 桥中线 */
+    content: "";
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, transparent 0, transparent 20px, #ffeb3b 20px, #ffeb3b 36px);
+    transform: translateY(-50%);
+  }
+
+  /* 桥两侧的拱桥柱子 */
+  .pillar {
+    position: absolute;
+    bottom: 30px; width: 40px; height: 100px;
+    background: linear-gradient(180deg, #a1887f 0%, #5d4037 100%);
+    border: 4px solid #3e2723;
+    border-radius: 8px 8px 0 0;
+  }
+  .pillar.left  { left: 6%; }
+  .pillar.right { right: 6%; }
+
+  /* 河 */
+  .river {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 30px;
+    background: linear-gradient(180deg, #4fc3f7 0%, #0288d1 100%);
+  }
+  .river::before {
+    content: "";
+    position: absolute;
+    top: 8px; left: 0; right: 0;
+    height: 3px;
+    background: repeating-linear-gradient(90deg, transparent 0, transparent 16px, #fff 16px, #fff 28px);
+    opacity: 0.6;
+    animation: river-flow 2s linear infinite;
+  }
+  @keyframes river-flow {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-44px); }
+  }
+
+  /* 三道门 */
+  .gate {
+    position: absolute;
+    width: 90px; height: 130px;
+    bottom: 30px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    z-index: 20;
+  }
+  .gate:active { transform: translateY(2px); }
+
+  .gate .gate-frame {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 130px;
+    background: linear-gradient(180deg, #ff7043 0%, #bf360c 100%);
+    border: 5px solid #5d2e0d;
+    border-radius: 12px 12px 4px 4px;
+    box-shadow: inset 0 -10px 0 rgba(0,0,0,0.2), 0 4px 0 #5d2e0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .gate.g0 .gate-frame { background: linear-gradient(180deg, #ff7043 0%, #bf360c 100%); }
+  .gate.g1 .gate-frame { background: linear-gradient(180deg, #66bb6a 0%, #1b5e20 100%); }
+  .gate.g2 .gate-frame { background: linear-gradient(180deg, #42a5f5 0%, #0d47a1 100%); }
+  .gate.g3 .gate-frame { background: linear-gradient(180deg, #ab47bc 0%, #38006b 100%); }
+
+  .gate .label {
+    font-size: 48px; font-weight: 900;
+    color: white;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.4), -1px -1px 0 rgba(0,0,0,0.4);
+  }
+  .gate .gate-top {
+    position: absolute;
+    top: -16px; left: -8px; right: -8px;
+    height: 22px;
+    background: #5d2e0d;
+    border: 4px solid #3e2723;
+    border-radius: 6px;
+  }
+
+  /* 开门状态 */
+  .gate.open .gate-frame {
+    transform: translateY(-130px);
+    transition: transform 0.6s ease-out;
+  }
+  .gate.wrong .gate-frame {
+    animation: shake 0.5s;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px) rotate(-2deg); }
+    40% { transform: translateX(8px) rotate(2deg); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+
+  .gate.highlight {
+    animation: gate-pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes gate-pulse {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50%      { transform: scale(1.1); filter: brightness(1.2); }
+  }
+
+  /* 小车 */
+  .car {
+    position: absolute;
+    width: 110px; height: 90px;
+    bottom: 30px; left: 20px;
+    z-index: 15;
+    transition: bottom 0.5s, left 1.5s cubic-bezier(0.5, 1.5, 0.4, 1);
+  }
+  .car .car-body {
+    position: absolute;
+    bottom: 10px; left: 0; right: 0;
+    height: 60px;
+    background: linear-gradient(180deg, #42a5f5 0%, #1976d2 70%, #0d47a1 100%);
+    border: 4px solid #0e2f44;
+    border-radius: 18px 18px 8px 8px;
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,0.15), inset 0 4px 0 rgba(255,255,255,0.3), 0 4px 8px rgba(0,0,0,0.3);
+  }
+  .car .car-top {
+    position: absolute;
+    bottom: 50px; left: 16px; right: 16px;
+    height: 26px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.4));
+    border: 4px solid #0e2f44;
+    border-radius: 14px 14px 0 0;
+  }
+  .car .wheel-l, .car .wheel-r {
+    position: absolute;
+    bottom: 0;
+    width: 24px; height: 24px;
+    background: radial-gradient(circle, #616161 25%, #212121 60%, #424242 100%);
+    border: 4px solid #212121;
+    border-radius: 50%;
+  }
+  .car .wheel-l { left: 8px; }
+  .car .wheel-r { right: 8px; }
+  .car .wheel-l::before, .car .wheel-r::before {
+    content: ""; position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 8px; height: 8px;
+    background: #fdd835;
+    border-radius: 50%;
+  }
+  .car .light {
+    position: absolute;
+    bottom: 30px; right: -2px;
+    width: 10px; height: 10px;
+    background: radial-gradient(circle, #fff59d 30%, #fbc02d 100%);
+    border: 2px solid #5d4037;
+    border-radius: 50%;
+    box-shadow: 0 0 14px #fff59d;
+  }
+  .car.driving .wheel-l, .car.driving .wheel-r {
+    animation: spin 0.4s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 飞起的小星星 */
+  .star {
+    position: fixed;
+    pointer-events: none;
+    font-size: 42px;
+    animation: star-rise 1.2s ease-out forwards;
+    z-index: 200;
+  }
+  @keyframes star-rise {
+    0%   { transform: translateY(0) scale(0.4) rotate(0); opacity: 1; }
+    100% { transform: translateY(-180px) scale(1.4) rotate(360deg); opacity: 0; }
+  }
+
+  /* 进度 */
+  .progress {
+    position: absolute;
+    bottom: 4px; left: 50%; transform: translateX(-50%);
+    font-size: 14px; font-weight: 900;
+    color: #ffeb3b;
+    text-shadow: 2px 2px 0 #5d4037;
+    z-index: 30;
+    white-space: nowrap;
+  }
+
+  /* 完成弹层 */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  .overlay.show { display: flex; }
+  .overlay .card {
+    background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 100%);
+    border: 5px solid #5d4037;
+    border-radius: 24px;
+    padding: 36px 40px;
+    text-align: center;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+  }
+  .overlay h2 { margin: 0 0 12px; font-size: 36px; color: #bf360c; }
+  .overlay p  { margin: 0 0 22px; font-size: 18px; color: #5d4037; }
+  .overlay button {
+    padding: 12px 28px;
+    background: #ff7043;
+    color: white;
+    border: 4px solid #5d2e0d;
+    border-radius: 24px;
+    font-size: 20px; font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #bf360c;
+  }
+  .overlay button:active { transform: translateY(3px); box-shadow: 0 2px 0 #bf360c; }
+
+  /* 烟花 */
+  .firework {
+    position: fixed;
+    pointer-events: none;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    animation: firework 1.2s ease-out forwards;
+    z-index: 200;
+  }
+  @keyframes firework {
+    0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(10); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <a class="back" href="../../">← 回家</a>
+  <button class="sound-toggle" id="soundToggle">🔊</button>
+  <h1 class="title">🌉 小车过字母桥</h1>
+  <div class="prompt" id="prompt">点一下 <span class="target">A</span> 的门让小车开过去</div>
+
+  <div class="scene">
+    <div class="bridge"></div>
+    <div class="pillar left"></div>
+    <div class="pillar right"></div>
+    <div class="river"></div>
+    <div class="car" id="car">
+      <div class="car-top"></div>
+      <div class="car-body"></div>
+      <div class="wheel-l"></div>
+      <div class="wheel-r"></div>
+      <div class="light"></div>
+    </div>
+    <div id="gates"></div>
+  </div>
+
+  <div class="progress" id="progress">第 1 / 8 关</div>
+
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <h2>🎉 过桥成功！</h2>
+      <p>小车顺利到达啦，再来一次？</p>
+      <button id="nextBtn">再来一次 🚗</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const NUMBERS = ['1','2','3','4','5','6','7','8','9','10'];
+  const POOL = [...ALPHABET, ...NUMBERS];
+
+  const car = document.getElementById('car');
+  const gatesEl = document.getElementById('gates');
+  const promptEl = document.getElementById('prompt');
+  const overlay = document.getElementById('overlay');
+  const nextBtn = document.getElementById('nextBtn');
+  const progressEl = document.getElementById('progress');
+  const soundToggle = document.getElementById('soundToggle');
+
+  let soundOn = true;
+  let busy = false;
+  let round = 0;
+  const TOTAL_ROUNDS = 8;
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // 声音系统（简版）
+  let _ttsBroken = false;
+  let _audioCtx = null;
+  function _getCtx() {
+    if (!_audioCtx) {
+      try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ _audioCtx = null; }
+    }
+    return _audioCtx;
+  }
+  function _tone(when, freq, dur, vol, type) {
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(vol || 0.4, when + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(when); osc.stop(when + dur + 0.05);
+  }
+  function speak(val) {
+    if (!soundOn) return;
+    if (/^[A-Z]$/.test(val)) {
+      if ('speechSynthesis' in window && !_ttsBroken) {
+        try {
+          const u = new SpeechSynthesisUtterance(val.toLowerCase());
+          u.lang = 'en-US'; u.rate = 0.9; u.pitch = 1.3;
+          u.onerror = () => { _ttsBroken = true; };
+          window.speechSynthesis.speak(u);
+          return;
+        } catch(e) { _ttsBroken = true; }
+      }
+      const ctx = _getCtx(); if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const freq = 440 + (val.charCodeAt(0) - 65) * 25;
+      _tone(now, freq, 0.18, 0.4);
+    } else {
+      if ('speechSynthesis' in window && !_ttsBroken) {
+        try {
+          const u = new SpeechSynthesisUtterance(val);
+          u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.3;
+          u.onerror = () => { _ttsBroken = true; };
+          window.speechSynthesis.speak(u);
+          return;
+        } catch(e) { _ttsBroken = true; }
+      }
+      const ctx = _getCtx(); if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const n = parseInt(val, 10) || 1;
+      _tone(now, 440 + (n - 1) * 40, 0.15, 0.4);
+    }
+  }
+  function speakPraise() {
+    if (!soundOn) return;
+    const phrases = ['过桥成功！', '太棒啦！', '继续出发！', '好厉害！'];
+    const t = phrases[Math.floor(Math.random() * phrases.length)];
+    if ('speechSynthesis' in window && !_ttsBroken) {
+      try {
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = 'zh-CN'; u.rate = 1.2; u.pitch = 1.4;
+        u.onerror = () => { _ttsBroken = true; };
+        window.speechSynthesis.speak(u);
+        return;
+      } catch(e) { _ttsBroken = true; }
+    }
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    _tone(now, 523, 0.12, 0.35);
+    _tone(now + 0.13, 659, 0.18, 0.4);
+  }
+
+  soundToggle.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundToggle.textContent = soundOn ? '🔊' : '🔇';
+    try { window.speechSynthesis.cancel(); } catch(e){}
+  });
+
+  function startRound() {
+    busy = false;
+    gatesEl.innerHTML = '';
+    overlay.classList.remove('show');
+
+    // 抽 1 个目标 + 3 个干扰
+    const all = shuffle([...POOL]).slice(0, 4);
+    const target = all[0];
+    const distractor = all.slice(1, 3);  // 2 个干扰
+    const choices = shuffle([target, ...distractor]);
+    const colors = ['g0','g1','g2'];
+
+    // 三道门，均匀分布
+    const positions = ['20%', '45%', '70%'];
+    choices.forEach((val, i) => {
+      const gate = document.createElement('div');
+      gate.className = `gate ${colors[i]}`;
+      gate.style.left = positions[i];
+      gate.dataset.value = val;
+      gate.innerHTML = `
+        <div class="gate-top"></div>
+        <div class="gate-frame">
+          <div class="label">${val}</div>
+        </div>
+      `;
+      gate.addEventListener('click', () => handleGate(gate, val, target));
+      gatesEl.appendChild(gate);
+    });
+
+    // 更新提示
+    promptEl.innerHTML = `点一下 <span class="target">${target}</span> 的门让小车开过去`;
+
+    // 重置小车位置
+    car.style.transition = 'none';
+    car.style.left = '20px';
+    car.style.bottom = '30px';
+    car.classList.remove('driving');
+    car.offsetHeight;
+
+    // 入场：小车开到桥前
+    setTimeout(() => {
+      car.style.transition = 'left 1.2s ease-out';
+      car.style.left = 'calc(15% - 55px)';
+    }, 300);
+
+    // 朗读目标
+    setTimeout(() => speak(target), 600);
+    progressEl.textContent = `第 ${round + 1} / ${TOTAL_ROUNDS} 关`;
+  }
+
+  function handleGate(gate, val, target) {
+    if (busy) return;
+    if (val === target) {
+      // 正确：开门 + 小车开过去
+      busy = true;
+      gate.classList.add('open');
+      const idx = Array.from(gatesEl.children).indexOf(gate);
+      const positions = ['20%', '45%', '70%'];
+      const gateLeft = parseFloat(positions[idx]);
+      const carDestLeft = `calc(${gateLeft}% - 55px)`;
+
+      car.classList.add('driving');
+      car.style.transition = 'left 1.2s ease-in-out';
+      car.style.left = carDestLeft;
+
+      speak(target);
+      setTimeout(speakPraise, 500);
+      spawnStars(gate);
+
+      // 小车过了门，继续向右开到屏幕外
+      setTimeout(() => {
+        car.style.transition = 'left 2s linear';
+        car.style.left = '110%';
+      }, 1300);
+
+      setTimeout(() => {
+        round++;
+        if (round >= TOTAL_ROUNDS) {
+          showOverlay();
+        } else {
+          startRound();
+        }
+      }, 3500);
+    } else {
+      // 错误：摇头 + 提示
+      gate.classList.add('wrong');
+      setTimeout(() => gate.classList.remove('wrong'), 600);
+    }
+  }
+
+  function spawnStars(gate) {
+    const r = gate.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const icons = ['⭐','🌟','✨','💫'];
+    for (let i = 0; i < 8; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.textContent = icons[i % icons.length];
+      s.style.left = (cx + (Math.random() * 100 - 50)) + 'px';
+      s.style.top  = (cy + Math.random() * 60 - 30) + 'px';
+      s.style.position = 'fixed';
+      s.style.animationDelay = (i * 60) + 'ms';
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 2000);
+    }
+  }
+
+  function showOverlay() {
+    overlay.classList.add('show');
+    if (soundOn) {
+      setTimeout(() => {
+        if ('speechSynthesis' in window && !_ttsBroken) {
+          try {
+            const u = new SpeechSynthesisUtterance('太棒啦！全部过桥成功！');
+            u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.4;
+            window.speechSynthesis.speak(u);
+          } catch(e) { _ttsBroken = true; }
+        } else {
+          const ctx = _getCtx(); if (!ctx) return;
+          if (ctx.state === 'suspended') ctx.resume();
+          const now = ctx.currentTime;
+          _tone(now, 523, 0.12, 0.4);
+          _tone(now + 0.13, 659, 0.12, 0.4);
+          _tone(now + 0.26, 784, 0.25, 0.45);
+        }
+      }, 300);
+    }
+  }
+
+  nextBtn.addEventListener('click', () => {
+    round = 0;
+    startRound();
+  });
+
+  startRound();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>停车场找车位</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #87ceeb 0%, #b0e0e6 60%, #90ee90 60%, #7ccd7c 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    touch-action: manipulation;
+  }
+
+  .back {
+    position: absolute; top: 16px; left: 16px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 24px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    text-decoration: none;
+    box-shadow: 0 3px 0 #5d4037;
+    z-index: 50;
+  }
+  .back:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
+
+  .sound-toggle {
+    position: absolute; top: 16px; right: 16px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 24px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #5d4037;
+    z-index: 50;
+  }
+  .sound-toggle:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
+
+  .title {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 22px; font-weight: 900;
+    color: #fff;
+    text-shadow: 2px 2px 0 #5b8cbe;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  .mode-toggle {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px;
+    background: rgba(255,255,255,0.85);
+    padding: 5px;
+    border-radius: 22px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    z-index: 10;
+  }
+  .mode-toggle button {
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    border-radius: 16px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+  }
+  .mode-toggle button.active {
+    background: #ff7043; color: white;
+  }
+
+  /* 上半部分：停车位 */
+  .parking-area {
+    position: absolute;
+    top: 100px; left: 0; right: 0;
+    height: 320px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    padding: 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .spot {
+    position: relative;
+    width: 130px; height: 170px;
+    background: #5d4037;
+    border: 4px solid #3e2723;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 6px #6d4c41, inset 0 -10px 0 rgba(0,0,0,0.4);
+  }
+  .spot::before {
+    /* 中线 */
+    content: ""; position: absolute;
+    top: 8px; bottom: 8px; left: 50%;
+    width: 3px;
+    background: repeating-linear-gradient(180deg, #ffeb3b 0, #ffeb3b 8px, transparent 8px, transparent 16px);
+    transform: translateX(-50%);
+  }
+  .spot::after {
+    /* 停车位 P 字 */
+    content: "P"; position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 38px; font-weight: 900;
+    color: rgba(255,255,255,0.18);
+  }
+  .spot .label {
+    position: absolute;
+    top: -32px; left: 50%;
+    transform: translateX(-50%);
+    width: 70px; height: 70px;
+    background: linear-gradient(180deg, #fff 0%, #fff8e1 100%);
+    border: 4px solid #5d4037;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; font-weight: 900;
+    color: #d35400;
+    text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    box-shadow: 0 4px 0 #5d4037;
+  }
+
+  .spot.highlight {
+    background: #2e7d32;
+    border-color: #1b5e20;
+    animation: spot-glow 0.8s ease-in-out infinite;
+  }
+  @keyframes spot-glow {
+    0%, 100% { box-shadow: inset 0 0 0 6px #4caf50, inset 0 -10px 0 rgba(0,0,0,0.4), 0 0 0 0 rgba(76,175,80,0.7); }
+    50%      { box-shadow: inset 0 0 0 6px #4caf50, inset 0 -10px 0 rgba(0,0,0,0.4), 0 0 0 12px rgba(76,175,80,0); }
+  }
+  .spot.occupied {
+    background: #4e342e;
+  }
+
+  /* 下半部分：路上停着的车 */
+  .road-area {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 260px;
+    background: linear-gradient(180deg, transparent 0%, transparent 20%, #555 20%, #555 100%);
+    padding-top: 24px;
+  }
+  .road-area::before {
+    /* 道路中线 */
+    content: ""; position: absolute;
+    top: 60px; left: 0; right: 0;
+    height: 6px;
+    background: repeating-linear-gradient(90deg, transparent 0, transparent 24px, #ffeb3b 24px, #ffeb3b 48px);
+  }
+
+  .cars-row {
+    position: absolute;
+    bottom: 30px; left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 0 16px;
+    flex-wrap: wrap;
+  }
+
+  /* 一辆小车的样式 */
+  .car-card {
+    position: relative;
+    width: 120px; height: 100px;
+    cursor: pointer;
+    touch-action: none;
+    z-index: 10;
+  }
+
+  .car-body {
+    position: absolute;
+    bottom: 10px; left: 0; right: 0;
+    height: 70px;
+    background: linear-gradient(180deg, var(--c1, #ff7043) 0%, var(--c2, #d35400) 70%, var(--c3, #a04000) 100%);
+    border: 4px solid #5d2e0d;
+    border-radius: 18px 18px 8px 8px;
+    box-shadow: inset 0 -10px 0 rgba(0,0,0,0.15), inset 0 5px 0 rgba(255,255,255,0.3), 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  .car-top {
+    position: absolute;
+    bottom: 56px; left: 18px; right: 18px;
+    height: 30px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%);
+    border: 4px solid #5d2e0d;
+    border-radius: 14px 14px 0 0;
+  }
+
+  /* 车顶上的字母/数字牌子 */
+  .car-sign {
+    position: absolute;
+    top: -4px; left: 50%;
+    transform: translateX(-50%);
+    width: 44px; height: 44px;
+    background: #fff;
+    border: 4px solid #5d2e0d;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900;
+    color: #d35400;
+    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    z-index: 2;
+  }
+  /* 杆子 */
+  .car-sign::before {
+    content: ""; position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    width: 6px; height: 10px;
+    background: #5d2e0d;
+  }
+
+  /* 轮子 */
+  .wheel-l, .wheel-r {
+    position: absolute;
+    bottom: 0;
+    width: 26px; height: 26px;
+    background: radial-gradient(circle, #616161 25%, #212121 60%, #424242 100%);
+    border: 4px solid #212121;
+    border-radius: 50%;
+  }
+  .wheel-l { left: 8px; }
+  .wheel-r { right: 8px; }
+  .wheel-l::before, .wheel-r::before {
+    content: ""; position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px; height: 8px;
+    background: #fdd835;
+    border-radius: 50%;
+  }
+
+  /* 颜色变量 */
+  .car-card.c0 { --c1:#ff7043; --c2:#d35400; --c3:#a04000; }
+  .car-card.c1 { --c1:#66bb6a; --c2:#2e7d32; --c3:#1b5e20; }
+  .car-card.c2 { --c1:#ab47bc; --c2:#6a1b9a; --c3:#38006b; }
+  .car-card.c3 { --c1:#42a5f5; --c2:#1976d2; --c3:#0d47a1; }
+  .car-card.c4 { --c1:#ffd54f; --c2:#f57c00; --c3:#e65100; }
+  .car-card.c5 { --c1:#ec407a; --c2:#ad1457; --c3:#880e4f; }
+
+  /* 拖动中 */
+  .car-card.dragging {
+    z-index: 1000;
+    transition: none;
+    cursor: grabbing;
+  }
+
+  /* 飞向车位 */
+  .car-card.flying {
+    transition: all 0.55s cubic-bezier(0.5, 1.6, 0.4, 1);
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .car-card.parked {
+    position: absolute;
+    z-index: 30;
+  }
+
+  /* 摇头反馈 */
+  .car-card.shake { animation: shake 0.5s; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-8px) rotate(-3deg)}
+    40%{transform:translateX(8px) rotate(3deg)}
+    60%{transform:translateX(-6px)}
+    80%{transform:translateX(6px)}
+  }
+
+  /* 高亮等待 */
+  .car-card.highlight { animation: car-pulse 0.8s ease-in-out infinite; }
+  @keyframes car-pulse {
+    0%,100%{transform:scale(1)}
+    50%{transform:scale(1.08)}
+  }
+
+  /* 进度 */
+  .progress {
+    position: absolute;
+    bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-size: 16px; font-weight: 900;
+    color: #ffeb3b;
+    text-shadow: 2px 2px 0 #5d4037;
+    z-index: 30;
+    white-space: nowrap;
+  }
+
+  /* 飞起的星星 */
+  .star {
+    position: fixed;
+    pointer-events: none;
+    font-size: 48px;
+    animation: star-rise 1.4s ease-out forwards;
+    z-index: 200;
+  }
+  @keyframes star-rise {
+    0%   { transform: translate(-50%, 0) scale(0.3) rotate(0); opacity: 1; }
+    100% { transform: translate(-50%, -240px) scale(1.6) rotate(360deg); opacity: 0; }
+  }
+
+  /* 完成时的烟花 */
+  .firework {
+    position: fixed;
+    pointer-events: none;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    animation: firework 1.2s ease-out forwards;
+    z-index: 200;
+  }
+  @keyframes firework {
+    0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+    50%  { opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(8); opacity: 0; }
+  }
+
+  /* 居中弹层 */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  .overlay.show { display: flex; }
+  .overlay .card {
+    background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 100%);
+    border: 5px solid #5d4037;
+    border-radius: 24px;
+    padding: 36px 40px;
+    text-align: center;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+  }
+  .overlay h2 { margin: 0 0 12px; font-size: 36px; color: #bf360c; }
+  .overlay p  { margin: 0 0 22px; font-size: 18px; color: #5d4037; }
+  .overlay button {
+    padding: 12px 28px;
+    background: #ff7043;
+    color: white;
+    border: 4px solid #5d2e0d;
+    border-radius: 24px;
+    font-size: 20px; font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #bf360c;
+  }
+  .overlay button:active { transform: translateY(3px); box-shadow: 0 2px 0 #bf360c; }
+</style>
+</head>
+<body>
+  <a class="back" href="../../">← 回家</a>
+  <button class="sound-toggle" id="soundToggle">🔊</button>
+  <h1 class="title">🅿️ 停车场找车位</h1>
+
+  <div class="mode-toggle" id="modeToggle">
+    <button class="active" data-mode="drag">✋ 拖拽</button>
+    <button data-mode="tap">👆 点击</button>
+  </div>
+
+  <div class="parking-area" id="parkingArea"></div>
+  <div class="road-area">
+    <div class="cars-row" id="carsRow"></div>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <h2>🎉 全部停好啦！</h2>
+      <p>小朋友真棒！再来一局？</p>
+      <button id="nextBtn">再来一局 🚗</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ============ 配置 ============
+  // 内容池：26 个字母 + 10 个数字 = 36
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const NUMBERS = ['1','2','3','4','5','6','7','8','9','10'];
+  const POOL = [...ALPHABET, ...NUMBERS];
+  const COLORS = ['c0','c1','c2','c3','c4','c5'];
+  const SPOT_COUNT = 3;        // 每局 3 个车位（2 岁娃注意力短，少一点）
+  const CAR_COLORS = ['#ff7043','#66bb6a','#ab47bc','#42a5f5','#ffd54f','#ec407a'];
+
+  // ============ DOM ============
+  const parkingArea = document.getElementById('parkingArea');
+  const carsRow = document.getElementById('carsRow');
+  const overlay = document.getElementById('overlay');
+  const nextBtn = document.getElementById('nextBtn');
+  const progressEl = document.getElementById('progress');
+  const soundToggle = document.getElementById('soundToggle');
+  const modeToggle = document.getElementById('modeToggle');
+
+  let mode = 'drag';   // 默认拖拽
+  let soundOn = true;
+  let busy = false;
+  let currentRound = [];  // [{ value:'A', color:'c0' }, ...] 当前轮的小车
+  let parked = 0;
+
+  // ============ 工具 ============
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function pickN(arr, n) {
+    return shuffle([...arr]).slice(0, n);
+  }
+
+  // ============ 声音系统 ============
+  let _ttsBroken = false;
+  let _audioCtx = null;
+  function _getCtx() {
+    if (!_audioCtx) {
+      try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ _audioCtx = null; }
+    }
+    return _audioCtx;
+  }
+  function _tone(when, freq, dur, vol, type) {
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(vol || 0.4, when + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(when); osc.stop(when + dur + 0.05);
+  }
+  function speakLetter(val) {
+    if (!soundOn) return;
+    // 字母：用英文 / 数字：用中文
+    if (/^[A-Z]$/.test(val)) {
+      if ('speechSynthesis' in window && !_ttsBroken) {
+        try {
+          const u = new SpeechSynthesisUtterance(val.toLowerCase());
+          u.lang = 'en-US'; u.rate = 0.9; u.pitch = 1.3;
+          u.onerror = () => { _ttsBroken = true; };
+          window.speechSynthesis.speak(u);
+          return;
+        } catch(e) { _ttsBroken = true; }
+      }
+      // 兑底：按字母差发不同频率
+      const ctx = _getCtx(); if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const freq = 440 + (val.charCodeAt(0) - 65) * 25;
+      _tone(now, freq, 0.18, 0.4);
+    } else {
+      // 数字：中文 TTS
+      if ('speechSynthesis' in window && !_ttsBroken) {
+        try {
+          const u = new SpeechSynthesisUtterance(val);
+          u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.3;
+          u.onerror = () => { _ttsBroken = true; };
+          window.speechSynthesis.speak(u);
+          return;
+        } catch(e) { _ttsBroken = true; }
+      }
+      // 兑底
+      const ctx = _getCtx(); if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const n = parseInt(val, 10) || 1;
+      const base = 440 + (n - 1) * 40;
+      _tone(now, base, 0.15, 0.4);
+      if (n === 10) _tone(now + 0.12, base + 60, 0.15, 0.4);
+    }
+  }
+  function speakPraise() {
+    if (!soundOn) return;
+    const phrases = ['真棒！', '好厉害！', '太聪明啦！', '再来一个！', '宝宝加油！'];
+    const text = phrases[Math.floor(Math.random() * phrases.length)];
+    if ('speechSynthesis' in window && !_ttsBroken) {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'zh-CN'; u.rate = 1.2; u.pitch = 1.4;
+        u.onerror = () => { _ttsBroken = true; };
+        window.speechSynthesis.speak(u);
+        return;
+      } catch(e) { _ttsBroken = true; }
+    }
+    // 兑底
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    _tone(now, 523, 0.12, 0.35);
+    _tone(now + 0.13, 659, 0.18, 0.4);
+  }
+
+  // ============ UI 模式切换 ============
+  modeToggle.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      if (busy) return;
+      modeToggle.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      mode = b.dataset.mode;
+    });
+  });
+
+  soundToggle.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundToggle.textContent = soundOn ? '🔊' : '🔇';
+    try { window.speechSynthesis.cancel(); } catch(e){}
+  });
+
+  // ============ 主流程：每轮 ============
+  function startRound() {
+    busy = false;
+    parked = 0;
+    parkingArea.innerHTML = '';
+    carsRow.innerHTML = '';
+    overlay.classList.remove('show');
+
+    // 抽 3 个不重复的标识
+    const picked = pickN(POOL, SPOT_COUNT);
+    currentRound = picked.map((v, i) => ({ value: v, color: COLORS[i % COLORS.length] }));
+
+    // 创建停车位
+    currentRound.forEach(item => {
+      const spot = document.createElement('div');
+      spot.className = 'spot';
+      spot.dataset.value = item.value;
+      spot.innerHTML = `<div class="label">${item.value}</div>`;
+      parkingArea.appendChild(spot);
+    });
+
+    // 创建小车（车顶贴字母/数字）
+    currentRound.forEach(item => {
+      const car = createCar(item);
+      carsRow.appendChild(car);
+    });
+
+    // 顺序朗读一遍，让娃先听一遍（如果开着声音）
+    currentRound.forEach((item, i) => {
+      setTimeout(() => speakLetter(item.value), 600 + i * 700);
+    });
+
+    updateProgress();
+  }
+
+  function updateProgress() {
+    progressEl.textContent = `${parked} / ${SPOT_COUNT} 停好啦 ${'⭐'.repeat(parked)}`;
+  }
+
+  // ============ 创建小车 ============
+  function createCar(item) {
+    const car = document.createElement('div');
+    car.className = `car-card ${item.color}`;
+    car.dataset.value = item.value;
+    car.innerHTML = `
+      <div class="car-sign">${item.value}</div>
+      <div class="car-top"></div>
+      <div class="car-body"></div>
+      <div class="wheel-l"></div>
+      <div class="wheel-r"></div>
+    `;
+    car.addEventListener('click', e => {
+      if (mode !== 'tap' || busy) return;
+      handleTap(car);
+    });
+    car.addEventListener('pointerdown', e => {
+      if (mode !== 'drag' || busy) return;
+      e.preventDefault();
+      startDrag(car, e);
+    });
+    return car;
+  }
+
+  // ============ 点击模式 ============
+  function handleTap(car) {
+    // 找到第一个空车位 + 标签匹配的车位
+    const spots = parkingArea.querySelectorAll('.spot');
+    const target = Array.from(spots).find(s => !s.classList.contains('occupied') && s.dataset.value === car.dataset.value);
+    if (target) {
+      flyToSpot(car, target);
+    } else {
+      car.classList.add('shake');
+      setTimeout(() => car.classList.remove('shake'), 500);
+    }
+  }
+
+  // ============ 拖拽模式 ============
+  function startDrag(car, e) {
+    const rect = car.getBoundingClientRect();
+    car.style.position = 'fixed';
+    car.style.left = rect.left + 'px';
+    car.style.top = rect.top + 'px';
+    car.style.width = rect.width + 'px';
+    car.style.height = rect.height + 'px';
+    car.style.margin = '0';
+    car.classList.add('dragging');
+    const off = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    car._off = off;
+    car.setPointerCapture(e.pointerId);
+    car.addEventListener('pointermove', onMove);
+    car.addEventListener('pointerup', onEnd);
+    car.addEventListener('pointercancel', onEnd);
+  }
+  function onMove(e) {
+    const car = e.currentTarget;
+    if (!car._off) return;
+    e.preventDefault();
+    car.style.left = (e.clientX - car._off.x) + 'px';
+    car.style.top  = (e.clientY - car._off.y) + 'px';
+  }
+  function onEnd(e) {
+    const car = e.currentTarget;
+    car.removeEventListener('pointermove', onMove);
+    car.removeEventListener('pointerup', onEnd);
+    car.removeEventListener('pointercancel', onEnd);
+    car.classList.remove('dragging');
+    const result = checkDrop(e.clientX, e.clientY, car);
+    if (result === 'correct') {
+      const spots = parkingArea.querySelectorAll('.spot');
+      const target = Array.from(spots).find(s => !s.classList.contains('occupied') && s.dataset.value === car.dataset.value);
+      if (target) flyToSpot(car, target);
+    } else {
+      // 弹回原位
+      car.style.transition = 'all 0.3s ease';
+      car.style.opacity = '0';
+      setTimeout(() => {
+        car.style.position = '';
+        car.style.left = '';
+        car.style.top = '';
+        car.style.width = '';
+        car.style.height = '';
+        car.style.margin = '';
+        car.style.opacity = '';
+        car.style.transition = '';
+        carsRow.appendChild(car);
+      }, 300);
+      if (result === 'wrong') {
+        car.classList.add('shake');
+        setTimeout(() => car.classList.remove('shake'), 500);
+      }
+    }
+  }
+
+  function checkDrop(cx, cy, car) {
+    const spots = parkingArea.querySelectorAll('.spot');
+    for (const s of spots) {
+      if (s.classList.contains('occupied')) continue;
+      const r = s.getBoundingClientRect();
+      const inX = cx >= r.left - 40 && cx <= r.right + 40;
+      const inY = cy >= r.top - 20  && cy <= r.bottom + 20;
+      if (inX && inY) {
+        return s.dataset.value === car.dataset.value ? 'correct' : 'wrong';
+      }
+    }
+    return 'none';
+  }
+
+  // ============ 飞向车位 ============
+  function flyToSpot(car, spot) {
+    busy = true;
+    const fromRect = car.getBoundingClientRect();
+    const toRect = spot.getBoundingClientRect();
+    car.style.position = 'fixed';
+    car.style.left = fromRect.left + 'px';
+    car.style.top = fromRect.top + 'px';
+    car.style.width = fromRect.width + 'px';
+    car.style.height = fromRect.height + 'px';
+    car.style.margin = '0';
+    requestAnimationFrame(() => {
+      car.classList.add('flying');
+      car.style.left = (toRect.left + (toRect.width - fromRect.width) / 2) + 'px';
+      car.style.top  = (toRect.top + (toRect.height - fromRect.height) / 2) + 'px';
+    });
+    setTimeout(() => {
+      car.classList.remove('flying');
+      // 把车"放进"车位：定位到 spot 内部
+      spot.classList.add('occupied');
+      spot.appendChild(car);
+      car.style.position = 'absolute';
+      car.style.left = (spot.offsetWidth - car.offsetWidth) / 2 + 'px';
+      car.style.top  = (spot.offsetHeight - car.offsetHeight) / 2 + 8 + 'px';
+      car.style.width = 'auto';
+      car.style.height = 'auto';
+      car.style.margin = '0';
+
+      parked++;
+      updateProgress();
+      speakLetter(car.dataset.value);
+      setTimeout(() => speakPraise(), 400);
+      spawnStars(toRect);
+
+      if (parked >= SPOT_COUNT) {
+        setTimeout(showOverlay, 1200);
+      } else {
+        busy = false;
+      }
+    }, 550);
+  }
+
+  function spawnStars(rect) {
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top;
+    const icons = ['⭐','🌟','✨','💫'];
+    for (let i = 0; i < 6; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.textContent = icons[i % icons.length];
+      s.style.left = (cx + (Math.random() * 80 - 40)) + 'px';
+      s.style.top  = (cy + Math.random() * 40) + 'px';
+      s.style.position = 'fixed';
+      s.style.animationDelay = (i * 80) + 'ms';
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 2000);
+    }
+  }
+
+  function showOverlay() {
+    overlay.classList.add('show');
+    if (soundOn) {
+      setTimeout(() => {
+        if ('speechSynthesis' in window && !_ttsBroken) {
+          try {
+            const u = new SpeechSynthesisUtterance('太棒啦！全部停好啦！');
+            u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.4;
+            window.speechSynthesis.speak(u);
+          } catch(e) { _ttsBroken = true; }
+        } else {
+          const ctx = _getCtx(); if (!ctx) return;
+          if (ctx.state === 'suspended') ctx.resume();
+          const now = ctx.currentTime;
+          _tone(now, 523, 0.12, 0.4);
+          _tone(now + 0.13, 659, 0.12, 0.4);
+          _tone(now + 0.26, 784, 0.25, 0.45);
+        }
+      }, 300);
+    }
+  }
+
+  nextBtn.addEventListener('click', startRound);
+
+  // ============ 启动 ============
+  startRound();
+})();
+</script>
+</body>
+</html>
