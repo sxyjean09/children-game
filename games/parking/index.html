@@ -682,7 +682,7 @@
 
   <div class="parking-area">
     <div class="spot" id="spot">
-      <div class="label" id="spotLabel">一</div>
+      <div class="label">一</div>
     </div>
   </div>
 
@@ -729,7 +729,6 @@
   // ============ DOM ============
   const carsRow = document.getElementById('carsRow');
   const spot = document.getElementById('spot');
-  const spotLabel = document.getElementById('spotLabel');
   const hintEl = document.getElementById('hint');
   const overlay = document.getElementById('overlay');
   const againBtn = document.getElementById('againBtn');
@@ -816,13 +815,15 @@
   // ============ 主流程 ============
   function startLevel() {
     busy = false;
+    // 顺序：先决定关卡数字，再清场 + 重建 label
+    currentNum = correctCount + 1;
+
     carsRow.innerHTML = '';
     spot.classList.remove('occupied', 'highlight');
+    // 清掉上一关停在车位里的车（重置 spot 的内容 + 重建 label）
+    spot.innerHTML = '<div class="label">' + CHINESE[currentNum - 1] + '</div>';
     overlay.classList.remove('show');
 
-    // 当前关卡：从 1-10 抽一个还没用过的数字
-    currentNum = correctCount + 1;
-    spotLabel.textContent = CHINESE[currentNum - 1];
     hintEl.innerHTML = `点 <span class="ch">${CHINESE[currentNum - 1]}</span> 的车开到车位上`;
 
     // 4 台车：1 个正确 + 3 个干扰
