@@ -975,7 +975,12 @@
         if (correctCount >= TOTAL) {
           finale();
         } else {
-          startLevel();
+          // 让车在车位中央原地淡出 + 缩小，再清场进下一关
+          // 避免车看起来"瞬移到车位左上角再消失"
+          car.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+          car.style.opacity = '0';
+          car.style.transform = 'scale(0.5)';
+          setTimeout(() => startLevel(), 500);
         }
       }, 1500);
     }, 700);
