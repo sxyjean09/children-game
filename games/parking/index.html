@@ -981,6 +981,17 @@
       car.style.height = 'auto';
       car.style.margin = '0';
 
+      // [DEBUG] 临时调试：打印车在 spot 里的实际位置
+      requestAnimationFrame(() => {
+        const cs = getComputedStyle(car);
+        const sr = spot.getBoundingClientRect();
+        const cr = car.getBoundingClientRect();
+        console.log('[parking-debug] spot rect:', sr.left.toFixed(0), sr.top.toFixed(0), sr.width.toFixed(0)+'x'+sr.height.toFixed(0));
+        console.log('[parking-debug] car  rect:', cr.left.toFixed(0), cr.top.toFixed(0), cr.width.toFixed(0)+'x'+cr.height.toFixed(0));
+        console.log('[parking-debug] car  style: pos='+cs.position+' left='+cs.left+' top='+cs.top+' w='+cs.width+' h='+cs.height);
+        console.log('[parking-debug] car  in spot: dx='+(cr.left-sr.left).toFixed(0)+' dy='+(cr.top-sr.top).toFixed(0));
+      });
+
       speak('太棒啦', 'zh-CN');
       spawnStars(toRect);
 
