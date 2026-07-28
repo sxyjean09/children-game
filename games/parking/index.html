@@ -140,6 +140,7 @@
     position: absolute;
     top: -28px; left: 50%;
     transform: translateX(-50%);
+    transition: top 0.5s ease-out, opacity 0.5s ease-out;
     min-width: 90px; height: 56px;
     background: linear-gradient(180deg, #fff 0%, #fff8e1 100%);
     border: 4px solid #5d4037;
@@ -164,6 +165,13 @@
     background: linear-gradient(180deg, #4e342e 0%, #3e2723 100%);
   }
   .spot.occupied .label { opacity: 0; }
+
+  /* label 进场：从 spot 内部中央清 0 滑上来到顶都 -28px */
+  .spot .label.entering {
+    top: 50%;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
 
   /* 道路 */
   .road-area {
@@ -821,7 +829,13 @@
     carsRow.innerHTML = '';
     spot.classList.remove('occupied', 'highlight');
     // 清掉上一关停在车位里的车（重置 spot 的内容 + 重建 label）
-    spot.innerHTML = '<div class="label">' + CHINESE[currentNum - 1] + '</div>';
+    // label 初始加上 .entering（在 spot 中央透明），下一帧去掉 → 从车位中央滑上去到顶都 -28px
+    // 避免 label 跳出现在 spot 顶都 -28px 位置、看起来像车跑到停车场的左上角
+    spot.innerHTML = '<div class="label entering">' + CHINESE[currentNum - 1] + '</div>';
+    requestAnimationFrame(() => {
+      const lbl = spot.querySelector('.label');
+      if (lbl) lbl.classList.remove('entering');
+    });
     overlay.classList.remove('show');
 
     hintEl.innerHTML = `点 <span class="ch">${CHINESE[currentNum - 1]}</span> 的车开到车位上`;
