@@ -67,36 +67,6 @@
     letter-spacing: 2px;
   }
 
-  /* 提示文字 */
-  .hint {
-    position: absolute;
-    top: 88px; left: 50%; transform: translateX(-50%);
-    background: rgba(255,255,255,0.92);
-    padding: 8px 18px;
-    border-radius: 20px;
-    border: 3px solid #5d4037;
-    font-size: 16px; font-weight: 900;
-    color: #5d4037;
-    z-index: 10;
-    white-space: nowrap;
-    text-align: center;
-  }
-  .hint .ch {
-    display: inline-block;
-    margin: 0 3px;
-    padding: 2px 10px;
-    background: #ff7043;
-    color: white;
-    border-radius: 10px;
-    font-size: 20px;
-    text-shadow: none;
-    animation: hint-pulse 1s ease-in-out infinite;
-  }
-  @keyframes hint-pulse {
-    0%, 100% { transform: scale(1); }
-    50%      { transform: scale(1.15); }
-  }
-
   /* 车位区 */
   .parking-area {
     position: absolute;
@@ -688,7 +658,7 @@
 
   <h1 class="title">🅿️ 停车场找车位</h1>
   <div class="level-badge">第 <span id="levelNum">1</span> 关<span class="stars" id="stars"></span></div>
-  <div class="hint" id="hint">把 <span class="ch">一</span> 开到车位上</div>
+  <div class="hint" id="hint" style="display:none"></div>
 
   <div class="parking-area">
     <div class="spot" id="spot">
@@ -750,6 +720,7 @@
   let busy = false;
   let currentNum = 1;           // 当前关卡的"阿拉伯数字"
   let correctCount = 0;
+  let finaleCars = [];          // 通关后转圈的车，againBtn/回家 时清掉
 
   // ============ 工具 ============
   function shuffle(a) {
@@ -840,7 +811,8 @@
     });
     overlay.classList.remove('show');
 
-    hintEl.innerHTML = `点 <span class="ch">${CHINESE[currentNum - 1]}</span> 的车开到车位上`;
+    // 提示关闭（两岁多宝宝用大图标、拟声词代替文字提示）
+    hintEl.innerHTML = '';
 
     // 4 台车：1 个正确 + 3 个干扰
     const distractors = pickDistractors(currentNum, 3);
@@ -1024,33 +996,152 @@
   // ============ 总通关 ============
   function finale() {
     busy = true;
-    // 让车位里那辆车继续开走，开回右边
-    const car = spot.querySelector('.car-card');
-    if (car) {
-      car.style.transition = 'all 1.2s ease-in';
-      car.style.left = '120%';
-      setTimeout(() => {
-        if (spot.contains(car)) spot.removeChild(car);
-      }, 1300);
-    }
-    // 大星星
-    setTimeout(() => {
-      const big = document.createElement('div');
-      big.className = 'big-star';
-      big.textContent = '🚗';
-      big.style.left = '50%';
-      big.style.top  = '40%';
-      document.body.appendChild(big);
-      setTimeout(() => big.remove(), 2000);
-    }, 400);
-    // 撒花
-    setTimeout(spawnConfetti, 600);
-    setTimeout(spawnConfetti, 1400);
+    // 1. 清掉车位里最后一辆车
+    const lastCar = spot.querySelector('.car-card');
+    if (lastCar && spot.contains(lastCar)) spot.removeChild(lastCar);
 
+    // 2. 生成 10 辆车，依次从屏幕四周随机飞入中心
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const cars = [];
+    for (let i = 0; i < 10; i++) {
+      const car = createCar(i + 1);
+      car.style.position = 'fixed';
+      car.style.left = '50%';
+      car.style.top  = '50%';
+      car.style.width = '110px';
+      car.style.height = '110px';
+      car.style.transform = 'translate(-50%, -50%) scale(0.3)';
+      car.style.transition = 'none';
+      car.style.opacity = '0';
+      car.style.zIndex = 250;
+      car.style.pointerEvents = 'none';
+      document.body.appendChild(car);
+      cars.push(car);
+    }
+    finaleCars = cars;  // 存档，againBtn 会清掉
+
+    // 为每辆车随机选一个入场的起点（屏幕边缘）
+    const entrySpots = [];
+    for (let i = 0; i < 10; i++) {
+      const side = i % 4; // 0=上 1=右 2=下 3=左
+      let ex, ey;
+      const offset = 80 + (i % 3) * 30;
+      if (side === 0) { ex = W * (0.15 + 0.7 * ((i / 4 | 0) / 2)); ey = -offset; }
+      else if (side === 1) { ex = W + offset; ey = H * (0.2 + 0.6 * ((i / 4 | 0) / 2)); }
+      else if (side === 2) { ex = W * (0.7 - 0.7 * ((i / 4 | 0) / 2)); ey = H + offset; }
+      else { ex = -offset; ey = H * (0.7 - 0.6 * ((i / 4 | 0) / 2)); }
+      entrySpots.push({ ex, ey });
+    }
+
+    // 依次飞入（每辆间隔 300ms）
+    cars.forEach((car, i) => {
+      const { ex, ey } = entrySpots[i];
+      setTimeout(() => {
+        // 起点：屏幕外
+        car.style.left = ex + 'px';
+        car.style.top  = ey + 'px';
+        car.style.transform = 'translate(-50%, -50%) scale(0.6) rotate(' + ((Math.random() * 60) - 30) + 'deg)';
+        car.style.opacity = '1';
+        car.style.transition = 'all 0.7s cubic-bezier(0.3, 1.3, 0.4, 1)';
+        // 终点：屏幕中心
+        requestAnimationFrame(() => {
+          car.style.left = '50%';
+          car.style.top  = '50%';
+          car.style.transform = 'translate(-50%, -50%) scale(1) rotate(0deg)';
+        });
+      }, i * 300);
+    });
+
+    // 3. 全部到齐后（~10*300 + 700 = 3700ms），让 10 辆车围成圆圈转 10 秒
+    const STAGE_MS = 3700;
+    const SPIN_MS = 10000;       // 转圈 10 秒
+    const SPIN_RPS = 3 / 10;     // 3 圈 / 10 秒
+    const RADIUS = Math.min(W, H) * 0.28;  // 圆半径：屏幕短边的 28%
+
+    let spinRaf = null;
     setTimeout(() => {
-      overlay.classList.add('show');
-      speak('太棒啦！全部完成！', 'zh-CN');
-    }, 2200);
+      // 先过渡到圆周起点位置
+      const cx = W / 2;
+      const cy = H / 2;
+      const n = cars.length;
+      const startAngles = cars.map((_, i) => (i / n) * Math.PI * 2); // 起始角度均匀分布
+      let initialAngle = 0;
+      // 设置每辆车到初始位置，启用后续 RAF 转圈
+      cars.forEach((car, i) => {
+        const a = startAngles[i];
+        const x = cx + RADIUS * Math.cos(a);
+        const y = cy + RADIUS * Math.sin(a);
+        car.style.transition = 'all 0.6s ease-out';
+        car.style.left = x + 'px';
+        car.style.top  = y + 'px';
+        // 车头朝向圆心：旋转 = 角度 + 90°（0° 是车头朝上）
+        const deg = a * 180 / Math.PI + 90;
+        car.style.transform = 'translate(-50%, -50%) rotate(' + deg + 'deg)';
+      });
+
+      // 6. 撒花（表示庆祝）
+      setTimeout(spawnConfetti, 200);
+      setTimeout(spawnConfetti, 1200);
+      setTimeout(spawnConfetti, 2500);
+
+      // 7. 开始转圈（用 RAF 帧驱动）
+      const startTime = performance.now();
+      function tick(now) {
+        const t = (now - startTime) / 1000; // 秒
+        const angleOffset = t * SPIN_RPS * Math.PI * 2; // 转过的总角度
+        cars.forEach((car, i) => {
+          const a = startAngles[i] + angleOffset;
+          const x = cx + RADIUS * Math.cos(a);
+          const y = cy + RADIUS * Math.sin(a);
+          car.style.transition = 'none';
+          car.style.left = x + 'px';
+          car.style.top  = y + 'px';
+          // 车头始终朝向圆心
+          const deg = a * 180 / Math.PI + 90;
+          car.style.transform = 'translate(-50%, -50%) rotate(' + deg + 'deg)';
+        });
+        if (now - startTime < SPIN_MS) {
+          spinRaf = requestAnimationFrame(tick);
+        } else {
+          // 转完收尾
+          stopSpin();
+        }
+      }
+      // 等过渡完成（600ms）再开始转圈，避免初始 transition 抵消
+      setTimeout(() => {
+        spinRaf = requestAnimationFrame(tick);
+      }, 650);
+
+      function stopSpin() {
+        if (spinRaf) cancelAnimationFrame(spinRaf);
+        spinRaf = null;
+        // 弹通关页
+        overlay.classList.add('show');
+        speak('太棒啦！全部完成！', 'zh-CN');
+        // 不移除车，背景继续转 5 秒作为装饰
+        const endTime = performance.now();
+        const EXTRA_MS = 5000;
+        function tick2(now) {
+          const t = (now - endTime) / 1000;
+          const angleOffset = t * SPIN_RPS * Math.PI * 2;
+          cars.forEach((car, i) => {
+            const a = startAngles[i] + angleOffset;
+            const x = cx + RADIUS * Math.cos(a);
+            const y = cy + RADIUS * Math.sin(a);
+            car.style.transition = 'none';
+            car.style.left = x + 'px';
+            car.style.top  = y + 'px';
+            const deg = a * 180 / Math.PI + 90;
+            car.style.transform = 'translate(-50%, -50%) rotate(' + deg + 'deg)';
+          });
+          if (now - endTime < EXTRA_MS) {
+            requestAnimationFrame(tick2);
+          }
+        }
+        requestAnimationFrame(tick2);
+      }
+    }, STAGE_MS);
   }
 
   function spawnConfetti() {
@@ -1072,8 +1163,19 @@
   }
 
   againBtn.addEventListener('click', () => {
+    // 清除通关后转圈的车
+    finaleCars.forEach(c => { if (c.parentNode) c.parentNode.removeChild(c); });
+    finaleCars = [];
     correctCount = 0;
     startLevel();
+  });
+
+  // 回家按钮也要清车（防止 “回家” 后车还在转）
+  document.querySelectorAll('.overlay button.secondary').forEach(btn => {
+    btn.addEventListener('click', () => {
+      finaleCars.forEach(c => { if (c.parentNode) c.parentNode.removeChild(c); });
+      finaleCars = [];
+    });
   });
 
   // ============ 启动 ============
