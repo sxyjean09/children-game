@@ -214,6 +214,8 @@
   }
   .car-card.parked {
     position: absolute;
+    width: 130px; height: 130px;
+    overflow: visible;
     z-index: 30;
   }
   .car-card.shake { animation: shake 0.5s; }
@@ -977,30 +979,11 @@
       car.style.position = 'absolute';
       car.style.left = (spot.offsetWidth - car.offsetWidth) / 2 + 'px';
       car.style.top  = (spot.offsetHeight - car.offsetHeight) / 2 + 8 + 'px';
-      car.style.width = 'auto';
-      car.style.height = 'auto';
+      // 不要把 width/height 设 auto。车的所有子元素（车身/轮子/车牌）都是 position: absolute，
+      // 不参与车卡 layout flow。如果车卡 width/height 变 auto 会压缩为 0，车身会被挤压到车卡顶部。
+      car.style.width = '130px';
+      car.style.height = '130px';
       car.style.margin = '0';
-
-      // [DEBUG] 临时调试：在屏幕上叠加显示车的实时位置
-      const dbg = document.createElement('div');
-      dbg.id = 'parking-debug-overlay';
-      dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;background:#000;color:#0f0;font:14px/1.4 monospace;padding:8px 10px;border-radius:6px;z-index:9999;white-space:pre;max-width:90vw;';
-      const update = () => {
-        if (!document.body.contains(dbg)) return;
-        const cs = getComputedStyle(car);
-        const sr = spot.getBoundingClientRect();
-        const cr = car.getBoundingClientRect();
-        dbg.textContent =
-          'spot  L='+sr.left.toFixed(0)+' T='+sr.top.toFixed(0)+' '+sr.width.toFixed(0)+'x'+sr.height.toFixed(0)+'\n'+
-          'car   L='+cr.left.toFixed(0)+' T='+cr.top.toFixed(0)+' '+cr.width.toFixed(0)+'x'+cr.height.toFixed(0)+'\n'+
-          'car in spot  dx='+(cr.left-sr.left).toFixed(0)+' dy='+(cr.top-sr.top).toFixed(0)+'\n'+
-          'car style  pos='+cs.position+' L='+cs.left+' T='+cs.top;
-      };
-      dbg.textContent = '...';
-      document.body.appendChild(dbg);
-      update();
-      const dbgTimer = setInterval(update, 200);
-      setTimeout(() => { clearInterval(dbgTimer); dbg.remove(); }, 5000);
 
       speak('太棒啦', 'zh-CN');
       spawnStars(toRect);
