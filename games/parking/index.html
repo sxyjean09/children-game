@@ -15,6 +15,22 @@
     touch-action: manipulation;
   }
 
+  /* 通关后飘过的小车（和大厅背景一样） */
+  .finale-car {
+    position: fixed;
+    left: 0;
+    z-index: 250;
+    pointer-events: none;
+    animation: car-drive 8s linear infinite;
+    white-space: nowrap;
+    /* 苹果 emoji 车头默认朝左，从左往右跑需水平翻转让车头朝右 */
+    transform: scaleX(-1);
+  }
+  @keyframes car-drive {
+    from { transform: translateX(-10vw) scaleX(-1); }
+    to   { transform: translateX(110vw) scaleX(-1); }
+  }
+
   /* 顶部按钮区 */
   .top-bar {
     position: absolute;
@@ -228,16 +244,16 @@
   .car-card .wheel.l { left: 14px; }
   .car-card .wheel.r { right: 14px; }
 
-  /* 车牌：阿拉伯数字 */
+  /* 车牌：阿拉伯数字（放在车顶上） */
   .car-card .plate {
     position: absolute;
-    bottom: -2px; left: 50%;
+    top: 4px; left: 50%;
     transform: translateX(-50%);
     background: #fff;
     border: 3px solid #5d4037;
     border-radius: 8px;
-    padding: 4px 12px;
-    font-size: 20px; font-weight: 900;
+    padding: 2px 10px;
+    font-size: 18px; font-weight: 900;
     color: #d35400;
     box-shadow: 0 3px 6px rgba(0,0,0,0.3);
     z-index: 4;
@@ -596,17 +612,18 @@
     100% { transform: translate(-50%, -300px) scale(0.6); opacity: 0; }
   }
 
-  /* 庆祝撒花 */
+  /* 庆祝撒花（从顶部落下的彩带） */
   .confetti {
     position: fixed;
     pointer-events: none;
-    width: 12px; height: 16px;
-    animation: confetti 1.6s ease-out forwards;
+    width: 10px; height: 18px;
+    animation: confetti-fall 4s linear forwards;
     z-index: 200;
+    top: -30px;
   }
-  @keyframes confetti {
-    0%   { transform: translate(0,0) rotate(0); opacity: 1; }
-    100% { transform: translate(var(--dx), 60vh) rotate(720deg); opacity: 0; }
+  @keyframes confetti-fall {
+    0%   { transform: translate(0, 0) rotate(0); opacity: 1; }
+    100% { transform: translate(var(--dx), 110vh) rotate(720deg); opacity: 0.6; }
   }
 
   /* 总通关弹层 */
@@ -994,98 +1011,61 @@
   }
 
   // ============ 总通关 ============
+  // 和大厅背景一样：多辆 emoji 小车从左开到右，不同高度 + 不同速度
   function finale() {
     busy = true;
     // 1. 清掉车位里最后一辆车
     const lastCar = spot.querySelector('.car-card');
     if (lastCar && spot.contains(lastCar)) spot.removeChild(lastCar);
 
-    // 2. 生成 6 辆车，初始在屏幕左边外，车头朝右
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    // 2. 生成 8 辆 emoji 小车，同时从左边往右开
+    const EMOJI_CARS = ['🚗','🚕','🚙','🚌','🚓','🚑','🚒','🚐'];
     const cars = [];
-    for (let i = 0; i < 6; i++) {
-      const car = createCar(i + 1);
-      car.style.position = 'fixed';
-      car.style.width = '100px';
-      car.style.height = '100px';
-      car.style.zIndex = 250;
-      car.style.pointerEvents = 'none';
-      car.style.transition = 'none';
-      car.style.opacity = '0';
-      car.style.left = '-140px';
-      car.style.top  = (H * 0.5) + 'px';
-      car.style.transform = 'translate(0, -50%)';
+    EMOJI_CARS.forEach((emoji, i) => {
+      const car = document.createElement('div');
+      car.className = 'finale-car';
+      car.textContent = emoji;
+      car.style.bottom = (10 + Math.random() * 60) + '%';        // 高度 10%~70%，错开
+      car.style.animationDuration = (6 + Math.random() * 4) + 's';// 6~10 秒/趟
+      car.style.animationDelay = (-Math.random() * 8) + 's';      // 负 delay 让车一开始就在不同位置
+      car.style.fontSize = (32 + Math.random() * 18) + 'px';     // 32~50px，错开大小
       document.body.appendChild(car);
       cars.push(car);
-    }
+    });
     finaleCars = cars;
 
-    // 3. 车队在屏幕中线水平排开
-    const carW = 100;
-    const gap  = 20;
-    const totalW = carW * 6 + gap * 5; // 700px
-    const startX = (W - totalW) / 2;
+    // 3. 持续落彩带（10s 期间不间断地落一点，不宜过多）
+    const confettiTimer = setInterval(spawnConfetti, 450);
 
-    // 4. 头车先动，尾随出现：每辆在上一辆飞起后隔 450ms 出场
-    //    每辆从屏幕左外飞到自己的位置（800ms 飞行动画）
-    const ENTRY_INTERVAL = 450;  // 上一辆出场 → 下一辆出场的间隔
-    const ENTRY_DUR = 800;       // 每辆飞行耗时
-    cars.forEach((car, i) => {
-      const targetX = startX + i * (carW + gap);
-      setTimeout(() => {
-        car.style.transition = 'opacity 0.3s, left ' + ENTRY_DUR + 'ms cubic-bezier(0.3, 1.2, 0.4, 1)';
-        car.style.opacity = '1';
-        car.style.left = targetX + 'px';
-      }, i * ENTRY_INTERVAL);
-    });
-
-    // 5. 全部到齐后等 1.5s，期间撒花
-    const ALL_IN_MS = 6 * ENTRY_INTERVAL + ENTRY_DUR + 1500; // 6*450 + 800 + 1500 = 5000
-    setTimeout(() => { spawnConfetti(); }, ALL_IN_MS - 2000);
-    setTimeout(() => { spawnConfetti(); }, ALL_IN_MS - 800);
-    setTimeout(() => { spawnConfetti(); }, ALL_IN_MS + 100);
-
+    // 4. 10s 后弹通关页
     setTimeout(() => {
-      // 6. 头车先驶出：按入场顺序（从左到右）依次从右边驶出
-      //    出场间隔 350ms，飞行 1400ms（慢一点）
-      const EXIT_INTERVAL = 350;
-      const EXIT_DUR = 1400;
-      cars.forEach((car, i) => {
-        setTimeout(() => {
-          car.style.transition = 'left ' + EXIT_DUR + 'ms ease-in, opacity 0.3s';
-          car.style.left = (W + 100) + 'px';
-          // 飞出到中间时渐隐
-          setTimeout(() => { car.style.opacity = '0'; }, EXIT_DUR - 500);
-        }, i * EXIT_INTERVAL);
-      });
-
-      // 7. 弹通关页（最后一辆出场 0.6s 后）
-      const lastOutMs = (cars.length - 1) * EXIT_INTERVAL + EXIT_DUR;
+      clearInterval(confettiTimer);  // 停止生成新彩带
+      // 最后补一批大彩带收尾
+      spawnConfetti();
       setTimeout(() => {
         overlay.classList.add('show');
         speak('太棒啦！全部完成！', 'zh-CN');
-        // 剩下的车强制渐隐
-        cars.forEach(c => { if (c.style.opacity !== '0') { c.style.transition = 'opacity 0.4s'; c.style.opacity = '0'; } });
-      }, lastOutMs + 600);
-    }, ALL_IN_MS);
+        // 车继续跑（不再清，让用户可以看着车开过去）
+      }, 500);
+    }, 10000);
   }
 
   function spawnConfetti() {
     const colors = ['#ff7043','#66bb6a','#42a5f5','#ab47bc','#ffd54f','#ec407a'];
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-    for (let i = 0; i < 30; i++) {
+    const W = window.innerWidth;
+    for (let i = 0; i < 8; i++) {
       const c = document.createElement('div');
       c.className = 'confetti';
       c.style.background = colors[i % colors.length];
-      c.style.left = cx + 'px';
-      c.style.top  = cy + 'px';
-      c.style.setProperty('--dx', (Math.random() * 600 - 300) + 'px');
-      c.style.animationDelay = (Math.random() * 300) + 'ms';
+      c.style.left = (Math.random() * W) + 'px';
+      c.style.setProperty('--dx', (Math.random() * 160 - 80) + 'px');
+      c.style.animationDelay = (Math.random() * 600) + 'ms';
+      c.style.animationDuration = (3.5 + Math.random() * 2.5) + 's';
       c.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      c.style.width = (8 + Math.random() * 6) + 'px';
+      c.style.height = (14 + Math.random() * 8) + 'px';
       document.body.appendChild(c);
-      setTimeout(() => c.remove(), 2200);
+      setTimeout(() => c.remove(), 6500);
     }
   }
 
