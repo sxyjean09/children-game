@@ -981,16 +981,26 @@
       car.style.height = 'auto';
       car.style.margin = '0';
 
-      // [DEBUG] 临时调试：打印车在 spot 里的实际位置
-      requestAnimationFrame(() => {
+      // [DEBUG] 临时调试：在屏幕上叠加显示车的实时位置
+      const dbg = document.createElement('div');
+      dbg.id = 'parking-debug-overlay';
+      dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;background:#000;color:#0f0;font:14px/1.4 monospace;padding:8px 10px;border-radius:6px;z-index:9999;white-space:pre;max-width:90vw;';
+      const update = () => {
+        if (!document.body.contains(dbg)) return;
         const cs = getComputedStyle(car);
         const sr = spot.getBoundingClientRect();
         const cr = car.getBoundingClientRect();
-        console.log('[parking-debug] spot rect:', sr.left.toFixed(0), sr.top.toFixed(0), sr.width.toFixed(0)+'x'+sr.height.toFixed(0));
-        console.log('[parking-debug] car  rect:', cr.left.toFixed(0), cr.top.toFixed(0), cr.width.toFixed(0)+'x'+cr.height.toFixed(0));
-        console.log('[parking-debug] car  style: pos='+cs.position+' left='+cs.left+' top='+cs.top+' w='+cs.width+' h='+cs.height);
-        console.log('[parking-debug] car  in spot: dx='+(cr.left-sr.left).toFixed(0)+' dy='+(cr.top-sr.top).toFixed(0));
-      });
+        dbg.textContent =
+          'spot  L='+sr.left.toFixed(0)+' T='+sr.top.toFixed(0)+' '+sr.width.toFixed(0)+'x'+sr.height.toFixed(0)+'\n'+
+          'car   L='+cr.left.toFixed(0)+' T='+cr.top.toFixed(0)+' '+cr.width.toFixed(0)+'x'+cr.height.toFixed(0)+'\n'+
+          'car in spot  dx='+(cr.left-sr.left).toFixed(0)+' dy='+(cr.top-sr.top).toFixed(0)+'\n'+
+          'car style  pos='+cs.position+' L='+cs.left+' T='+cs.top;
+      };
+      dbg.textContent = '...';
+      document.body.appendChild(dbg);
+      update();
+      const dbgTimer = setInterval(update, 200);
+      setTimeout(() => { clearInterval(dbgTimer); dbg.remove(); }, 5000);
 
       speak('太棒啦', 'zh-CN');
       spawnStars(toRect);
