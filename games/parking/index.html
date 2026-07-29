@@ -38,6 +38,12 @@
     display: flex; justify-content: space-between; align-items: center;
     z-index: 50;
   }
+  /* 右上角按钮组：声音 + 乱序 紧凑贴在右上 */
+  .top-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
   .top-btn {
     padding: 8px 14px;
     background: #fff;
@@ -52,6 +58,18 @@
   .top-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
   .top-btn.on { background: #fff59d; }
   .top-btn.off { opacity: 0.55; }
+  /* 顺序模式开启时，顺序按钮高亮 + 持续微动一下吸引注意 */
+  .top-btn.order-on {
+    background: #a5d6a7;
+    border-color: #1b5e20;
+    color: #1b5e20;
+    box-shadow: 0 3px 0 #1b5e20;
+    animation: order-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes order-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.05); }
+  }
 
   .title {
     text-align: center;
@@ -670,7 +688,10 @@
 <body>
   <div class="top-bar">
     <a class="top-btn" href="../../">← 回家</a>
-    <button class="top-btn off" id="soundToggle">🔇 声音</button>
+    <div class="top-right">
+      <button class="top-btn off" id="soundToggle">🔇 声音</button>
+      <button class="top-btn" id="orderToggle" title="默认10关的汉字数字打乱出现；打开后按 一→二→…→十 顺序出现">🎲 乱序</button>
+    </div>
   </div>
 
   <h1 class="title">🅿️ 停车场找车位</h1>
@@ -732,9 +753,24 @@
   const levelNumEl = document.getElementById('levelNum');
   const starsEl = document.getElementById('stars');
   const soundToggle = document.getElementById('soundToggle');
+  const orderToggle = document.getElementById('orderToggle');
 
   let soundOn = false;          // 默认关闭
+  // 默认打乱10关汉字数字的出现顺序；点了"顺序"按钮才按一二三…十 顺序
+  let sequentialMode = false;
+  try {
+    sequentialMode = localStorage.getItem('parking.sequential') === '1';
+  } catch(e) { /* 隐私模式可能拒绝，降级为默认 */ }
+  // 本局 10 关对应的汉字数字顺序（关索引 → 中文数字 1-10）
+  let levelOrder = buildLevelOrder();
   let busy = false;
+
+  function syncOrderButton() {
+    orderToggle.textContent = sequentialMode ? '📶 顺序' : '🎲 乱序';
+    orderToggle.classList.toggle('order-on', sequentialMode);
+    orderToggle.classList.toggle('off', false);
+  }
+  syncOrderButton();
   let currentNum = 1;           // 当前关卡的"阿拉伯数字"
   let correctCount = 0;
   let finaleCars = [];          // 通关后转圈的车，againBtn/回家 时清掉
@@ -755,6 +791,16 @@
       if (i !== target) pool.push(i);
     }
     return shuffle(pool).slice(0, n);
+  }
+
+  // 生成本局 10 关的汉字数字出现顺序
+  // 顺序模式：一二三四五六七八九十
+  // 乱序模式：1-10 随机打乱
+  function buildLevelOrder() {
+    const arr = [];
+    for (let i = 1; i <= TOTAL; i++) arr.push(i);
+    if (!sequentialMode) shuffle(arr);
+    return arr;
   }
 
   // ============ 声音（TTS + Web Audio 兑底）============
@@ -800,6 +846,16 @@
     else _tone(now + 0.13, 659, 0.18, 0.4);
   }
 
+  orderToggle.addEventListener('click', () => {
+    sequentialMode = !sequentialMode;
+    try { localStorage.setItem('parking.sequential', sequentialMode ? '1' : '0'); } catch(e) {}
+    syncOrderButton();
+    // 切顺序后从头开始（顺序变了，进度没意义了）
+    levelOrder = buildLevelOrder();
+    correctCount = 0;
+    startLevel();
+  });
+
   soundToggle.addEventListener('click', () => {
     soundOn = !soundOn;
     soundToggle.textContent = soundOn ? '🔊 声音' : '🔇 声音';
@@ -814,7 +870,7 @@
   function startLevel() {
     busy = false;
     // 顺序：先决定关卡数字，再清场 + 重建 label
-    currentNum = correctCount + 1;
+    currentNum = levelOrder[correctCount];
 
     carsRow.innerHTML = '';
     spot.classList.remove('occupied', 'highlight');
@@ -831,7 +887,7 @@
     // 提示关闭（两岁多宝宝用大图标、拟声词代替文字提示）
     hintEl.innerHTML = '';
 
-    // 4 台车：1 个正确 + 3 个干扰
+    // 4 台车：1 个正确 + 3 个干扰，随机排列
     const distractors = pickDistractors(currentNum, 3);
     const cars = shuffle([currentNum, ...distractors]);
     cars.forEach(n => {
@@ -1074,6 +1130,8 @@
     finaleCars.forEach(c => { if (c.parentNode) c.parentNode.removeChild(c); });
     finaleCars = [];
     correctCount = 0;
+    // 再玩一次时，乱序模式重新洗一次（每局顺序都不一样才像“乱序”）
+    levelOrder = buildLevelOrder();
     startLevel();
   });
 
