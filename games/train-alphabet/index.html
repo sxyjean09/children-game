@@ -587,6 +587,22 @@
   }
   .level-picker-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
 
+  /* 返回游戏大厅按钮（紧挨着关卡选择按钮右边） */
+  .home-btn {
+    position: absolute; top: 20px; left: 240px;
+    padding: 10px 16px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 30px;
+    font-size: 16px; font-weight: 700;
+    color: #5d4037;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #5d4037, 0 6px 12px rgba(0,0,0,0.2);
+    z-index: 20;
+  }
+  .home-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d4037; }
+
   /* 关卡选择弹窗 */
   .level-modal {
     position: fixed; inset: 0;
@@ -812,6 +828,7 @@
 
   <button class="reset" id="reset">🔄 重玩</button>
   <button class="level-picker-btn" id="levelPickerBtn">📋 关卡</button>
+  <a class="home-btn" id="homeBtn" href="../../" title="返回游戏大厅">🏠 回家</a>
 
   <!-- 关卡选择弹窗 -->
   <div class="level-modal" id="levelModal">

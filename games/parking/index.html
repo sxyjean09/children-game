@@ -100,6 +100,11 @@
     margin-left: 6px;
     letter-spacing: 2px;
   }
+  .level-badge .target-num {
+    margin-left: 8px;
+    color: #1976d2;
+    font-weight: 700;
+  }
 
   /* 车位区 */
   .parking-area {
@@ -695,7 +700,7 @@
   </div>
 
   <h1 class="title">🅿️ 停车场找车位</h1>
-  <div class="level-badge">第 <span id="levelNum">1</span> 关<span class="stars" id="stars"></span></div>
+  <div class="level-badge">第 <span id="levelNum">1</span> 关<span class="stars" id="stars"></span><span class="target-num" id="targetNum"></span></div>
   <div class="hint" id="hint" style="display:none"></div>
 
   <div class="parking-area">
@@ -752,6 +757,7 @@
   const againBtn = document.getElementById('againBtn');
   const levelNumEl = document.getElementById('levelNum');
   const starsEl = document.getElementById('stars');
+  const targetNumEl = document.getElementById('targetNum');
   const soundToggle = document.getElementById('soundToggle');
   const orderToggle = document.getElementById('orderToggle');
 
@@ -895,7 +901,8 @@
       carsRow.appendChild(car);
     });
 
-    levelNumEl.textContent = currentNum;
+    levelNumEl.textContent = (correctCount + 1);
+    targetNumEl.textContent = '找 ' + CHINESE[currentNum - 1];
     updateStars();
   }
 
