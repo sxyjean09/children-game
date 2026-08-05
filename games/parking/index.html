@@ -54,7 +54,17 @@
     text-decoration: none;
     cursor: pointer;
     box-shadow: 0 3px 0 #5d4037;
+    white-space: nowrap;
   }
+  /* 版本按钮：三个里最大，用主题色 */
+  .top-btn.version-btn {
+    background: #fff59d;
+    border-color: #f57f17;
+    color: #bf360c;
+    box-shadow: 0 3px 0 #f57f17;
+    padding: 8px 12px;
+  }
+  .top-btn.version-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #f57f17; }
   .top-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #5d4037; }
   .top-btn.on { background: #fff59d; }
   .top-btn.off { opacity: 0.55; }
@@ -106,18 +116,18 @@
     font-weight: 700;
   }
 
-  /* 车位区 */
+  /* 车位区 —— 给放大后的中文数字牌留够空间 */
   .parking-area {
     position: absolute;
-    top: 150px; left: 50%; transform: translateX(-50%);
+    top: 170px; left: 50%; transform: translateX(-50%);
     width: 100%; max-width: 600px;
-    height: 220px;
+    height: 240px;
     display: flex; align-items: center; justify-content: center;
   }
 
   .spot {
     position: relative;
-    width: 200px; height: 200px;
+    width: 220px; height: 220px;
     background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
     border: 5px solid #2c1810;
     border-radius: 18px;
@@ -139,27 +149,28 @@
   .spot::after {
     /* P 字 */
     content: "P"; position: absolute;
-    top: 12px; left: 14px;
-    font-size: 28px; font-weight: 900;
+    top: 14px; left: 16px;
+    font-size: 32px; font-weight: 900;
     color: rgba(255,255,255,0.15);
   }
 
-  /* 车位号牌（汉字数字） */
+  /* 车位号牌（汉字数字） —— 放大给两岁小朋友看 */
   .spot .label {
     position: absolute;
-    top: -28px; left: 50%;
+    top: -44px; left: 50%;
     transform: translateX(-50%);
     transition: top 0.5s ease-out, opacity 0.5s ease-out;
-    min-width: 90px; height: 56px;
+    min-width: 140px; height: 92px;
     background: linear-gradient(180deg, #fff 0%, #fff8e1 100%);
-    border: 4px solid #5d4037;
-    border-radius: 14px;
+    border: 5px solid #5d4037;
+    border-radius: 20px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 32px; font-weight: 900;
+    font-size: 60px; font-weight: 900;
     color: #d35400;
-    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
-    box-shadow: 0 4px 0 #5d4037;
-    padding: 0 16px;
+    text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 3px 0 rgba(0,0,0,0.18);
+    box-shadow: 0 6px 0 #5d4037;
+    padding: 0 22px;
+    letter-spacing: 2px;
   }
   .spot.highlight {
     background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
@@ -694,8 +705,9 @@
   <div class="top-bar">
     <a class="top-btn" href="../../">← 回家</a>
     <div class="top-right">
+      <button class="top-btn version-btn" id="versionToggle" title="选择关卡数量：1.0=10关 / 2.0=15关 / 3.0=20关">版本 1.0 · 10关</button>
       <button class="top-btn off" id="soundToggle">🔇 声音</button>
-      <button class="top-btn" id="orderToggle" title="默认10关的汉字数字打乱出现；打开后按 一→二→…→十 顺序出现">🎲 乱序</button>
+      <button class="top-btn" id="orderToggle" title="默认汉字数字打乱出现；打开后按 一→二→… 顺序出现">🎲 乱序</button>
     </div>
   </div>
 
@@ -717,7 +729,7 @@
     <div class="card">
       <h2>🎉 太棒啦！</h2>
       <div class="stars-row">⭐⭐⭐⭐⭐</div>
-      <p>10 关全部完成！小朋友超级厉害～</p>
+      <p><span id="overlayTotal">10</span> 关全部完成！小朋友超级厉害～</p>
       <button id="againBtn">再玩一次 🚗</button>
       <br>
       <button class="secondary" onclick="window.location.href='../../'">回家看看</button>
@@ -727,12 +739,18 @@
 <script>
 (function(){
   // ============ 配置 ============
-  // 汉字数字
-  const CHINESE = ['一','二','三','四','五','六','七','八','九','十'];
-  const TOTAL = 10;             // 总关数
-  const TOTAL_STARS = 3;        // 每关最多 3 星（首关 3，二关 2，三关 1…）
+  // 汉字数字 1～20（给 3.0 版本用，1.0/2.0 取前 10/15）
+  const CHINESE = ['一','二','三','四','五','六','七','八','九','十',
+                   '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+  const VERSIONS = {
+    '1.0': { total: 10, label: '1.0 · 10关' },
+    '2.0': { total: 15, label: '2.0 · 15关' },
+    '3.0': { total: 20, label: '3.0 · 20关' },
+  };
+  const DEFAULT_VERSION = '1.0';
+  const TOTAL_STARS = 3;        // 每关最多 3 星
 
-  // 10 种车辆造型
+  // 20 种车辆造型（3.0 版全用到）
   const VEHICLES = [
     'v-car',         // 1 小汽车
     'v-fire',        // 2 消防车
@@ -744,9 +762,19 @@
     'v-tractor',     // 8 拖拉机
     'v-tanker',      // 9 油罐车
     'v-taxi',        // 10 出租车
+    'v-car2',        // 11 小汽车 B
+    'v-fire2',       // 12 消防车 B
+    'v-police2',     // 13 警车 B
+    'v-bus2',        // 14 巴士 B
+    'v-ambulance2',  // 15 救护车 B
+    'v-truck2',      // 16 卡车 B
+    'v-excavator2',  // 17 挖掘机 B
+    'v-tractor2',    // 18 拖拉机 B
+    'v-tanker2',     // 19 油罐车 B
+    'v-taxi2',       // 20 出租车 B
   ];
 
-  // 每关用哪辆车（按数字选，10 辆车正好配 10 关）
+  // 每关用哪辆车（按数字选，20 辆车正好配 20 关）
   function vehicleFor(n) { return VEHICLES[(n - 1) % VEHICLES.length]; }
 
   // ============ DOM ============
@@ -760,14 +788,23 @@
   const targetNumEl = document.getElementById('targetNum');
   const soundToggle = document.getElementById('soundToggle');
   const orderToggle = document.getElementById('orderToggle');
+  const versionToggle = document.getElementById('versionToggle');
+  const overlayTotalEl = document.getElementById('overlayTotal');
 
   let soundOn = false;          // 默认关闭
-  // 默认打乱10关汉字数字的出现顺序；点了"顺序"按钮才按一二三…十 顺序
+  // 默认打乱汉字数字的出现顺序；点了"顺序"按钮才按一二三…十 顺序
   let sequentialMode = false;
   try {
     sequentialMode = localStorage.getItem('parking.sequential') === '1';
   } catch(e) { /* 隐私模式可能拒绝，降级为默认 */ }
-  // 本局 10 关对应的汉字数字顺序（关索引 → 中文数字 1-10）
+  // 版本：1.0/2.0/3.0 → 10/15/20 关
+  let version = DEFAULT_VERSION;
+  try {
+    const saved = localStorage.getItem('parking.version');
+    if (saved && VERSIONS[saved]) version = saved;
+  } catch(e) { /* 隐私模式 */ }
+  let TOTAL = VERSIONS[version].total;   // 当前版本总关数
+  // 本局关对应的汉字数字顺序（关索引 → 中文数字 1..TOTAL）
   let levelOrder = buildLevelOrder();
   let busy = false;
 
@@ -776,7 +813,13 @@
     orderToggle.classList.toggle('order-on', sequentialMode);
     orderToggle.classList.toggle('off', false);
   }
+  function syncVersionButton() {
+    const v = VERSIONS[version];
+    versionToggle.textContent = '版本 ' + v.label;
+    if (overlayTotalEl) overlayTotalEl.textContent = String(v.total);
+  }
   syncOrderButton();
+  syncVersionButton();
   let currentNum = 1;           // 当前关卡的"阿拉伯数字"
   let correctCount = 0;
   let finaleCars = [];          // 通关后转圈的车，againBtn/回家 时清掉
@@ -790,18 +833,18 @@
     return a;
   }
 
-  // 从 1-10 抽 N 个不等于 target 的数
+  // 从 1..TOTAL 抽 N 个不等于 target 的数（干扰项）
   function pickDistractors(target, n) {
     const pool = [];
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= TOTAL; i++) {
       if (i !== target) pool.push(i);
     }
     return shuffle(pool).slice(0, n);
   }
 
-  // 生成本局 10 关的汉字数字出现顺序
-  // 顺序模式：一二三四五六七八九十
-  // 乱序模式：1-10 随机打乱
+  // 生成本局关的汉字数字出现顺序
+  // 顺序模式：依次一二三…十
+  // 乱序模式：1..TOTAL 随机打乱
   function buildLevelOrder() {
     const arr = [];
     for (let i = 1; i <= TOTAL; i++) arr.push(i);
@@ -862,6 +905,23 @@
     startLevel();
   });
 
+  // 版本切换：1.0 → 2.0 → 3.0 → 1.0 ...
+  const VERSION_KEYS = Object.keys(VERSIONS);   // ['1.0','2.0','3.0']
+  versionToggle.addEventListener('click', () => {
+    const idx = VERSION_KEYS.indexOf(version);
+    version = VERSION_KEYS[(idx + 1) % VERSION_KEYS.length];
+    TOTAL = VERSIONS[version].total;
+    try { localStorage.setItem('parking.version', version); } catch(e) {}
+    syncVersionButton();
+    // 换版本：进度清零、重洗顺序、重起
+    levelOrder = buildLevelOrder();
+    correctCount = 0;
+    // 切版本时如果上局通关车还在转，一起清
+    finaleCars.forEach(c => { if (c.parentNode) c.parentNode.removeChild(c); });
+    finaleCars = [];
+    startLevel();
+  });
+
   soundToggle.addEventListener('click', () => {
     soundOn = !soundOn;
     soundToggle.textContent = soundOn ? '🔊 声音' : '🔇 声音';
@@ -907,14 +967,27 @@
   }
 
   function updateStars() {
-    // 当前关最多 3 星，按"关数"递减：第 1 关全 3 星、最后一关 1 星
-    const remainingStars = Math.max(1, Math.min(TOTAL_STARS, TOTAL_STARS - Math.floor((currentNum - 1) / 4)));
+    // 当前关最多 3 星。按 TOTAL 平分递减：第一关 3 星、最后一关 1 星。
+    // 例：TOTAL=10 → 1-3:3⭐, 4-6:2⭐, 7-10:1⭐
+    // 例：TOTAL=20 → 1-6:3⭐, 7-13:2⭐, 14-20:1⭐
+    const step = Math.max(1, Math.floor(TOTAL / TOTAL_STARS));
+    const idx = Math.floor((currentNum - 1) / step);   // 0,1,2...
+    const remainingStars = Math.max(1, TOTAL_STARS - Math.min(idx, TOTAL_STARS - 1));
     starsEl.textContent = '⭐'.repeat(remainingStars);
   }
 
   function createCar(num) {
     const car = document.createElement('div');
-    car.className = `car-card ${vehicleFor(num)}`;
+    // 11-20 的车型复用 1-10 的样式（class 名映射到基础车型）
+    const classMap = {
+      'v-car2': 'v-car', 'v-fire2': 'v-fire', 'v-police2': 'v-police',
+      'v-bus2': 'v-bus', 'v-ambulance2': 'v-ambulance', 'v-truck2': 'v-truck',
+      'v-excavator2': 'v-excavator', 'v-tractor2': 'v-tractor', 'v-tanker2': 'v-tanker',
+      'v-taxi2': 'v-taxi',
+    };
+    const rawCls = vehicleFor(num);
+    const cls = classMap[rawCls] || rawCls;
+    car.className = `car-card ${cls}`;
     car.dataset.num = num;
 
     // 不同车型用不同 innerHTML
@@ -929,7 +1002,15 @@
   }
 
   function buildVehicleInner(num) {
-    const cls = vehicleFor(num);
+    // 11-20 的车型复用 1-10 的样式（用 class 名映射）
+    const map = {
+      'v-car2': 'v-car', 'v-fire2': 'v-fire', 'v-police2': 'v-police',
+      'v-bus2': 'v-bus', 'v-ambulance2': 'v-ambulance', 'v-truck2': 'v-truck',
+      'v-excavator2': 'v-excavator', 'v-tractor2': 'v-tractor', 'v-tanker2': 'v-tanker',
+      'v-taxi2': 'v-taxi',
+    };
+    const rawCls = vehicleFor(num);
+    const cls = map[rawCls] || rawCls;
     if (cls === 'v-car') {
       return `<div class="vehicle"></div>`;
     } else if (cls === 'v-fire') {
