@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>小车过字母桥</title>
+<title>小车过数数桥</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
@@ -67,12 +67,15 @@
   .prompt .target {
     display: inline-block;
     margin: 0 4px;
-    padding: 2px 12px;
+    padding: 0 14px;
     background: #ff7043;
     color: white;
-    border-radius: 10px;
+    border-radius: 14px;
     text-shadow: none;
+    font-size: 32px;
+    line-height: 1.4;
     animation: hint-pulse 1s ease-in-out infinite;
+    vertical-align: middle;
   }
   @keyframes hint-pulse {
     0%, 100% { transform: scale(1); }
@@ -124,6 +127,48 @@
   }
   .pillar.left  { left: 6%; }
   .pillar.right { right: 6%; }
+
+  /* 数数区：桥上方一排小主题图标（云朵背景） */
+  .count-row {
+    position: absolute;
+    bottom: 270px; left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px 14px;
+    padding: 14px 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #fff8e1 100%);
+    border-radius: 40px;
+    box-shadow:
+      0 -4px 0 -2px rgba(255,255,255,0.6),
+      0 6px 0 rgba(0,0,0,0.15),
+      0 10px 18px rgba(0,0,0,0.2);
+    z-index: 12;
+    pointer-events: none;
+  }
+  .count-icon {
+    font-size: 44px;
+    line-height: 1;
+    animation: count-pop 0.5s ease-out backwards;
+  }
+  .count-icon:nth-child(1)  { animation-delay: 0.05s; }
+  .count-icon:nth-child(2)  { animation-delay: 0.10s; }
+  .count-icon:nth-child(3)  { animation-delay: 0.15s; }
+  .count-icon:nth-child(4)  { animation-delay: 0.20s; }
+  .count-icon:nth-child(5)  { animation-delay: 0.25s; }
+  .count-icon:nth-child(6)  { animation-delay: 0.30s; }
+  .count-icon:nth-child(7)  { animation-delay: 0.35s; }
+  .count-icon:nth-child(8)  { animation-delay: 0.40s; }
+  .count-icon:nth-child(9)  { animation-delay: 0.45s; }
+  .count-icon:nth-child(10) { animation-delay: 0.50s; }
+  @keyframes count-pop {
+    0%   { transform: scale(0) rotate(-180deg); opacity: 0; }
+    60%  { transform: scale(1.3) rotate(10deg); }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+  }
 
   /* 河 */
   .river {
@@ -285,13 +330,16 @@
 
   /* 进度 */
   .progress {
-    position: absolute;
-    bottom: 4px; left: 50%; transform: translateX(-50%);
+    position: fixed;
+    bottom: 8px; left: 50%; transform: translateX(-50%);
     font-size: 14px; font-weight: 900;
     color: #ffeb3b;
     text-shadow: 2px 2px 0 #5d4037;
-    z-index: 30;
+    z-index: 100;
     white-space: nowrap;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px 12px;
+    border-radius: 12px;
   }
 
   /* 完成弹层 */
@@ -343,8 +391,8 @@
 <body>
   <a class="back" href="../../">← 回家</a>
   <button class="sound-toggle" id="soundToggle">🔊</button>
-  <h1 class="title">🌉 小车过字母桥</h1>
-  <div class="prompt" id="prompt">点一下 <span class="target">A</span> 的门让小车开过去</div>
+  <h1 class="title">🌉 小车过数数桥</h1>
+  <div class="prompt" id="prompt">数一数有几个 <span class="target">🐢</span></div>
 
   <div class="scene">
     <div class="bridge"></div>
@@ -373,9 +421,21 @@
 
 <script>
 (function(){
-  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const NUMBERS = ['1','2','3','4','5','6','7','8','9','10'];
-  const POOL = [...ALPHABET, ...NUMBERS];
+  // 10 种主题：每关随机抽 1 个，桥上画对应数量的小东西
+  // name 是中文朗读用，emoji 是画面显示用，className 用于场景里的小图标样式
+  const THEMES = [
+    { name: '小海龟', emoji: '🐢' },
+    { name: '小猫',   emoji: '🐱' },
+    { name: '小兔',   emoji: '🐰' },
+    { name: '花朵',   emoji: '🌸' },
+    { name: '星星',   emoji: '⭐' },
+    { name: '小鸡',   emoji: '🐤' },
+    { name: '瓢虫',   emoji: '🐞' },
+    { name: '苹果',   emoji: '🍎' },
+    { name: '小鱼',   emoji: '🐠' },
+    { name: '气球',   emoji: '🎈' },
+  ];
+  const NUMBERS = [1,2,3,4,5,6,7,8,9,10];
 
   const car = document.getElementById('car');
   const gatesEl = document.getElementById('gates');
@@ -485,32 +545,40 @@
     gatesEl.innerHTML = '';
     overlay.classList.remove('show');
 
-    // 抽 1 个目标 + 3 个干扰
-    const all = shuffle([...POOL]).slice(0, 4);
-    const target = all[0];
-    const distractor = all.slice(1, 3);  // 2 个干扰
-    const choices = shuffle([target, ...distractor]);
-    const colors = ['g0','g1','g2'];
+    // 抽 1 个主题 + 1 个目标数量（1-10）
+    const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+    const target = 1 + Math.floor(Math.random() * 10);
 
-    // 三道门，均匀分布
+    // 生成 3 道门：target + 2 个不同的干扰数字
+    const distractors = [];
+    while (distractors.length < 2) {
+      const n = 1 + Math.floor(Math.random() * 10);
+      if (n !== target && !distractors.includes(n)) distractors.push(n);
+    }
+    const choices = shuffle([target, ...distractors]);
+    const colors = ['g0','g1','g2'];
     const positions = ['20%', '45%', '70%'];
+
     choices.forEach((val, i) => {
       const gate = document.createElement('div');
       gate.className = `gate ${colors[i]}`;
       gate.style.left = positions[i];
-      gate.dataset.value = val;
+      gate.dataset.value = String(val);
       gate.innerHTML = `
         <div class="gate-top"></div>
         <div class="gate-frame">
           <div class="label">${val}</div>
         </div>
       `;
-      gate.addEventListener('click', () => handleGate(gate, val, target));
+      gate.addEventListener('click', () => handleGate(gate, val, target, theme));
       gatesEl.appendChild(gate);
     });
 
-    // 更新提示
-    promptEl.innerHTML = `点一下 <span class="target">${target}</span> 的门让小车开过去`;
+    // 在桥上方画 N 个小主题图标（让小朋友来数）
+    drawCountIcons(theme, target);
+
+    // 更新提示：不出现数字
+    promptEl.innerHTML = `数一数有几个 <span class="target">${theme.emoji}</span>`;
 
     // 重置小车位置
     car.style.transition = 'none';
@@ -525,12 +593,48 @@
       car.style.left = 'calc(15% - 55px)';
     }, 300);
 
-    // 朗读目标
-    setTimeout(() => speak(target), 600);
+    // 朗读主题（比如"小海龟"），不读数字
+    setTimeout(() => speakTheme(theme), 600);
     progressEl.textContent = `第 ${round + 1} / ${TOTAL_ROUNDS} 关`;
   }
 
-  function handleGate(gate, val, target) {
+  // 在桥上方画 N 个小图标，乱序排列
+  function drawCountIcons(theme, n) {
+    // 先移除旧的
+    document.querySelectorAll('.count-icon').forEach(el => el.remove());
+
+    const container = document.createElement('div');
+    container.className = 'count-row';
+    // 控制在 10 个时也能排开：单行 5 个自动换行
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      el.className = 'count-icon';
+      el.textContent = theme.emoji;
+      container.appendChild(el);
+    }
+    document.querySelector('.scene').appendChild(container);
+  }
+
+  // 朗读主题（不带数字）
+  function speakTheme(theme) {
+    if (!soundOn) return;
+    if ('speechSynthesis' in window && !_ttsBroken) {
+      try {
+        const u = new SpeechSynthesisUtterance(theme.name);
+        u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.4;
+        u.onerror = () => { _ttsBroken = true; };
+        window.speechSynthesis.speak(u);
+        return;
+      } catch(e) { _ttsBroken = true; }
+    }
+    // 兑底声音：短促一响
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    _tone(now, 660, 0.1, 0.3);
+  }
+
+  function handleGate(gate, val, target, theme) {
     if (busy) return;
     if (val === target) {
       // 正确：开门 + 小车开过去
@@ -545,8 +649,9 @@
       car.style.transition = 'left 1.2s ease-in-out';
       car.style.left = carDestLeft;
 
-      speak(target);
-      setTimeout(speakPraise, 500);
+      // 朗读：先读数字，再说"对啦"
+      speakNumber(target);
+      setTimeout(speakPraise, 600);
       spawnStars(gate);
 
       // 小车过了门，继续向右开到屏幕外
@@ -564,10 +669,33 @@
         }
       }, 3500);
     } else {
-      // 错误：摇头 + 提示
+      // 错误：摇头 + 提示重新数
       gate.classList.add('wrong');
       setTimeout(() => gate.classList.remove('wrong'), 600);
+      // 再念一次主题，提醒小朋友再数一遍
+      setTimeout(() => speakTheme(theme), 400);
     }
+  }
+
+  // 朗读数字（独立函数，避免被字母分支干扰）
+  function speakNumber(n) {
+    if (!soundOn) return;
+    if ('speechSynthesis' in window && !_ttsBroken) {
+      try {
+        // 中文数字读法
+        const cn = ['零','一','二','三','四','五','六','七','八','九','十'];
+        const txt = n <= 10 ? cn[n] : String(n);
+        const u = new SpeechSynthesisUtterance(txt);
+        u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.4;
+        u.onerror = () => { _ttsBroken = true; };
+        window.speechSynthesis.speak(u);
+        return;
+      } catch(e) { _ttsBroken = true; }
+    }
+    const ctx = _getCtx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    _tone(now, 440 + (n - 1) * 30, 0.15, 0.4);
   }
 
   function spawnStars(gate) {
