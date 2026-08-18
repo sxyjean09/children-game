@@ -133,16 +133,16 @@
     position: absolute;
     bottom: 250px; left: 50%;
     transform: translateX(-50%);
-    max-width: 92%;
+    max-width: 88%;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     justify-items: center;
     align-items: center;
-    row-gap: 4px;
-    column-gap: 6px;
-    padding: 14px 22px;
+    row-gap: 2px;
+    column-gap: 2px;
+    padding: 12px 14px;
     background: linear-gradient(180deg, #ffffff 0%, #fff8e1 100%);
-    border-radius: 32px;
+    border-radius: 28px;
     box-shadow:
       0 -4px 0 -2px rgba(255,255,255,0.6),
       0 6px 0 rgba(0,0,0,0.15),
@@ -152,17 +152,17 @@
   }
   .count-icon {
     /* 默认：≤5 个用大号；>5 个由 JS 加 size-sm 类缩到小号 */
-    font-size: 44px;
+    font-size: 52px;
     line-height: 1;
     animation: count-pop 0.5s ease-out backwards;
     text-align: center;
     justify-self: center;
   }
   .count-row.size-sm .count-icon {
-    font-size: 32px;
+    font-size: 40px;
   }
   .count-row.size-xs .count-icon {
-    font-size: 26px;
+    font-size: 34px;
   }
   .count-icon:nth-child(1)  { animation-delay: 0.05s; }
   .count-icon:nth-child(2)  { animation-delay: 0.10s; }
@@ -450,7 +450,7 @@
     { name: '小火车', emoji: '🚂' },
     { name: '星星',   emoji: '⭐' },
     { name: '小鸡',   emoji: '🐤' },
-    { name: '小花',   emoji: '🌸' },
+    { name: '小蜜蜂', emoji: '🐝' },
     { name: '苹果',   emoji: '🍎' },
     { name: '小鱼',   emoji: '🐠' },
     { name: '气球',   emoji: '🎈' },
