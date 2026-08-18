@@ -128,17 +128,18 @@
   .pillar.left  { left: 6%; }
   .pillar.right { right: 6%; }
 
-  /* 数数区：桥上方一排小主题图标（云朵背景），一排最多 5 个，多了自动换行 */
+  /* 数数区：桥上方一排小主题图标（云朵背景），总是 5 列对齐，不满 5 个也按列位置 */
   .count-row {
     position: absolute;
     bottom: 250px; left: 50%;
     transform: translateX(-50%);
     max-width: 92%;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    justify-items: center;
     align-items: center;
-    gap: 2px 6px;
+    row-gap: 4px;
+    column-gap: 6px;
     padding: 14px 22px;
     background: linear-gradient(180deg, #ffffff 0%, #fff8e1 100%);
     border-radius: 32px;
@@ -154,10 +155,8 @@
     font-size: 44px;
     line-height: 1;
     animation: count-pop 0.5s ease-out backwards;
-    flex: 0 0 auto;
-    /* 用 width 限制每行 5 个：横向 (92% - padding - gap*4) / 5 */
-    width: calc((100% - 44px - 24px) / 5);
     text-align: center;
+    justify-self: center;
   }
   .count-row.size-sm .count-icon {
     font-size: 32px;
@@ -443,15 +442,15 @@
 <script>
 (function(){
   // 10 种主题：每关随机抽 1 个，桥上画对应数量的小东西
-  // name 是中文朗读用，emoji 是画面显示用，className 用于场景里的小图标样式
+  // name 是中文朗读用，emoji 是画面显示用
   const THEMES = [
     { name: '小海龟', emoji: '🐢' },
     { name: '小猫',   emoji: '🐱' },
     { name: '小兔',   emoji: '🐰' },
-    { name: '小火箭', emoji: '🚂' },
+    { name: '小火车', emoji: '🚂' },
     { name: '星星',   emoji: '⭐' },
     { name: '小鸡',   emoji: '🐤' },
-    { name: '瓢虫',   emoji: '🐞' },
+    { name: '小花',   emoji: '🌸' },
     { name: '苹果',   emoji: '🍎' },
     { name: '小鱼',   emoji: '🐠' },
     { name: '气球',   emoji: '🎈' },
