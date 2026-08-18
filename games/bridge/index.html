@@ -128,20 +128,20 @@
   .pillar.left  { left: 6%; }
   .pillar.right { right: 6%; }
 
-  /* 数数区：桥上方一排小主题图标（云朵背景） */
+  /* 数数区：桥上方一排小主题图标（云朵背景），一排最多 5 个，多了自动换行 */
   .count-row {
     position: absolute;
-    bottom: 270px; left: 50%;
+    bottom: 250px; left: 50%;
     transform: translateX(-50%);
-    max-width: 90%;
+    max-width: 92%;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: 4px 14px;
-    padding: 14px 24px;
+    gap: 2px 6px;
+    padding: 14px 22px;
     background: linear-gradient(180deg, #ffffff 0%, #fff8e1 100%);
-    border-radius: 40px;
+    border-radius: 32px;
     box-shadow:
       0 -4px 0 -2px rgba(255,255,255,0.6),
       0 6px 0 rgba(0,0,0,0.15),
@@ -150,9 +150,20 @@
     pointer-events: none;
   }
   .count-icon {
+    /* 默认：≤5 个用大号；>5 个由 JS 加 size-sm 类缩到小号 */
     font-size: 44px;
     line-height: 1;
     animation: count-pop 0.5s ease-out backwards;
+    flex: 0 0 auto;
+    /* 用 width 限制每行 5 个：横向 (92% - padding - gap*4) / 5 */
+    width: calc((100% - 44px - 24px) / 5);
+    text-align: center;
+  }
+  .count-row.size-sm .count-icon {
+    font-size: 32px;
+  }
+  .count-row.size-xs .count-icon {
+    font-size: 26px;
   }
   .count-icon:nth-child(1)  { animation-delay: 0.05s; }
   .count-icon:nth-child(2)  { animation-delay: 0.10s; }
@@ -164,6 +175,16 @@
   .count-icon:nth-child(8)  { animation-delay: 0.40s; }
   .count-icon:nth-child(9)  { animation-delay: 0.45s; }
   .count-icon:nth-child(10) { animation-delay: 0.50s; }
+  .count-icon:nth-child(11) { animation-delay: 0.55s; }
+  .count-icon:nth-child(12) { animation-delay: 0.60s; }
+  .count-icon:nth-child(13) { animation-delay: 0.65s; }
+  .count-icon:nth-child(14) { animation-delay: 0.70s; }
+  .count-icon:nth-child(15) { animation-delay: 0.75s; }
+  .count-icon:nth-child(16) { animation-delay: 0.80s; }
+  .count-icon:nth-child(17) { animation-delay: 0.85s; }
+  .count-icon:nth-child(18) { animation-delay: 0.90s; }
+  .count-icon:nth-child(19) { animation-delay: 0.95s; }
+  .count-icon:nth-child(20) { animation-delay: 1.00s; }
   @keyframes count-pop {
     0%   { transform: scale(0) rotate(-180deg); opacity: 0; }
     60%  { transform: scale(1.3) rotate(10deg); }
@@ -435,7 +456,7 @@
     { name: '小鱼',   emoji: '🐠' },
     { name: '气球',   emoji: '🎈' },
   ];
-  const NUMBERS = [1,2,3,4,5,6,7,8,9,10];
+  const NUMBERS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
 
   const car = document.getElementById('car');
   const gatesEl = document.getElementById('gates');
@@ -545,14 +566,14 @@
     gatesEl.innerHTML = '';
     overlay.classList.remove('show');
 
-    // 抽 1 个主题 + 1 个目标数量（1-10）
+    // 抽 1 个主题 + 1 个目标数量（1-20）
     const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
-    const target = 1 + Math.floor(Math.random() * 10);
+    const target = 1 + Math.floor(Math.random() * 20);
 
     // 生成 3 道门：target + 2 个不同的干扰数字
     const distractors = [];
     while (distractors.length < 2) {
-      const n = 1 + Math.floor(Math.random() * 10);
+      const n = 1 + Math.floor(Math.random() * 20);
       if (n !== target && !distractors.includes(n)) distractors.push(n);
     }
     const choices = shuffle([target, ...distractors]);
@@ -599,13 +620,18 @@
   }
 
   // 在桥上方画 N 个小图标，乱序排列
+  // 一排最多 5 个（用 flex width 控制）；N 越大缩得越小
   function drawCountIcons(theme, n) {
     // 先移除旧的
     document.querySelectorAll('.count-icon').forEach(el => el.remove());
+    document.querySelectorAll('.count-row').forEach(el => el.remove());
 
     const container = document.createElement('div');
     container.className = 'count-row';
-    // 控制在 10 个时也能排开：单行 5 个自动换行
+    // N>5 自动缩（小号），N>10 再缩（中号）
+    if (n > 10) container.classList.add('size-xs');
+    else if (n > 5) container.classList.add('size-sm');
+
     for (let i = 0; i < n; i++) {
       const el = document.createElement('div');
       el.className = 'count-icon';
@@ -682,9 +708,19 @@
     if (!soundOn) return;
     if ('speechSynthesis' in window && !_ttsBroken) {
       try {
-        // 中文数字读法
-        const cn = ['零','一','二','三','四','五','六','七','八','九','十'];
-        const txt = n <= 10 ? cn[n] : String(n);
+        // 中文数字读法：≤10 用单字；11-20 用"十X"格式
+        let txt;
+        if (n <= 10) {
+          const cn = ['零','一','二','三','四','五','六','七','八','九','十'];
+          txt = cn[n];
+        } else if (n < 20) {
+          // 11-19：十 + 单位
+          const cn = ['','一','二','三','四','五','六','七','八','九'];
+          txt = '十' + cn[n - 10];
+        } else {
+          // 20 直接读
+          txt = '二十';
+        }
         const u = new SpeechSynthesisUtterance(txt);
         u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.4;
         u.onerror = () => { _ttsBroken = true; };
@@ -695,7 +731,8 @@
     const ctx = _getCtx(); if (!ctx) return;
     if (ctx.state === 'suspended') ctx.resume();
     const now = ctx.currentTime;
-    _tone(now, 440 + (n - 1) * 30, 0.15, 0.4);
+    // 兑底音：超过 10 用更高频
+    _tone(now, 440 + Math.min(n - 1, 19) * 20, 0.15, 0.4);
   }
 
   function spawnStars(gate) {
