@@ -633,6 +633,36 @@
     color: #8d6e63;
     font-size: 14px; margin-bottom: 16px;
   }
+  .level-modal .dir-tabs {
+    display: flex; gap: 8px; justify-content: center;
+    margin-bottom: 12px;
+  }
+  .level-modal .dir-tabs button {
+    padding: 8px 14px;
+    background: #fff;
+    border: 3px solid #5d4037;
+    border-radius: 18px;
+    font-size: 14px; font-weight: 700;
+    color: #5d4037;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #5d4037;
+    transition: transform 0.15s;
+  }
+  .level-modal .dir-tabs button:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #5d4037;
+  }
+  .level-modal .dir-tabs button.active {
+    background: linear-gradient(180deg, #fff59d 0%, #ff7043 100%);
+    border-color: #bf360c;
+    color: #fff;
+    text-shadow: 1px 1px 0 #bf360c;
+  }
+  .level-modal .dir-tabs button.active[data-dir="reverse"] {
+    background: linear-gradient(180deg, #ce93d8 0%, #8e24aa 100%);
+    border-color: #4a148c;
+    text-shadow: 1px 1px 0 #4a148c;
+  }
   .level-modal .grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -834,6 +864,10 @@
   <div class="level-modal" id="levelModal">
     <div class="panel">
       <h2>🚂 选一关开始</h2>
+      <div class="dir-tabs" id="dirTabs">
+        <button class="active" data-dir="forward">🚂 顺序 A→Z</button>
+        <button data-dir="reverse">🔄 倒序 Z→A</button>
+      </div>
       <div class="sub">绿色 = 已通关 · 橙色 = 当前关 · 紫色 = 最终彩蛋</div>
       <div class="grid" id="levelGrid"></div>
       <div class="actions">
@@ -857,23 +891,36 @@
   const progressEl = document.getElementById('progress');
 
   // ============ 关卡数据 ============
-  // 每个 level 是 { head: 车头字母, toAdd: [3 个字母，需要新拼上去的] }
-  // 关 1：车头 A，要拼 B、C、D
-  // 关 2：车头 B，要拼 C、D、E
-  // 关 3：车头 C，要拼 D、E、F
-  // 关 4：车头 D，要拼 E、F、G
-  // ...
-  function buildLevels() {
+  // 每个 level 是 { head: 车头字母, toAdd: [需要新拼上去的字母序列] }
+  // 顺序：关 1 车头 A，要拼 B、C、D；关 2 车头 B，要拼 C、D、E；... → W
+  // 倒序：关 1 车头 Y，要拼 X、W、V；关 2 车头 X，要拼 W、V、U；... → D
+  // 两边都是 23 关（为了关数对称，倒序最后两关 toAdd 缩到 2/1 节，不越界）
+  function buildLevels(direction) {
     const levels = [];
-    // A → W 共 23 关（最后一关 W 完成即可拼出 X、Y、Z → 刚好让火车达到 26 节全字母）
-    for (let i = 0; i < 23; i++) {
-      const head = String.fromCharCode('A'.charCodeAt(0) + i);
-      const toAdd = [
-        String.fromCharCode(head.charCodeAt(0) + 1),
-        String.fromCharCode(head.charCodeAt(0) + 2),
-        String.fromCharCode(head.charCodeAt(0) + 3),
-      ];
-      levels.push({ head, toAdd });
+    if (direction === 'reverse') {
+      // 倒序：车头从 Y 开始递减
+      for (let i = 0; i < 23; i++) {
+        const head = String.fromCharCode('Y'.charCodeAt(0) - i);
+        const allNext = [];
+        for (let k = 1; k <= 3; k++) {
+          const c = String.fromCharCode(head.charCodeAt(0) - k);
+          if (c < 'A' || c > 'Z') break;
+          allNext.push(c);
+        }
+        levels.push({ head, toAdd: allNext });
+      }
+    } else {
+      // 顺序：车头从 A 开始递增
+      for (let i = 0; i < 23; i++) {
+        const head = String.fromCharCode('A'.charCodeAt(0) + i);
+        const allNext = [];
+        for (let k = 1; k <= 3; k++) {
+          const c = String.fromCharCode(head.charCodeAt(0) + k);
+          if (c < 'A' || c > 'Z') break;
+          allNext.push(c);
+        }
+        levels.push({ head, toAdd: allNext });
+      }
     }
     return levels;
   }
@@ -881,37 +928,62 @@
   // 是否最后一关
   function isLastLevel() { return levelIdx >= levels.length - 1; }
 
-  const levels = buildLevels();
+  let levels = buildLevels('forward');
   let levelIdx = 0;
   let expectedIdx = 0;
   let filledCount = 0;
   let mode = 'tap';
   let busy = false;
+  let direction = 'forward';  // 'forward' | 'reverse'
 
-  // ============ 关卡进度（localStorage 持久化）============
-  const STORAGE_KEY = 'train-letter-game-progress-v1';
-  // 存 { completed: [true, false, ...], unlocked: 关卡数（顺序通关时 = completed.length + 1，可跳关任意关） }
-  // 这里采用"自由选关"模式：所有关卡都可点，进度仅用来标记"已通关"
+  // ============ 关卡进度（localStorage 持久化，双方向各自一份）============
+  const STORAGE_KEY = 'train-letter-game-progress-v2';
+  // 存 { forward: { completed: [...] }, reverse: { completed: [...] } }
+  // 每个 direction 一份 23 关的完成数组，自由选关模式
+  function emptyProgress() {
+    return { completed: new Array(levels.length).fill(false) };
+  }
   function loadProgress() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { completed: new Array(levels.length).fill(false) };
-      const obj = JSON.parse(raw);
-      if (!obj.completed || obj.completed.length !== levels.length) {
-        return { completed: new Array(levels.length).fill(false) };
+      if (!raw) {
+        // 迁移老 key：老版本只有一份（顺序方向）的进度
+        const oldRaw = localStorage.getItem('train-letter-game-progress-v1');
+        let forward = emptyProgress();
+        if (oldRaw) {
+          try {
+            const obj = JSON.parse(oldRaw);
+            if (obj.completed && obj.completed.length === forward.completed.length) {
+              forward = { completed: obj.completed.slice() };
+            }
+          } catch(e) {}
+        }
+        return { forward, reverse: emptyProgress() };
       }
-      return { completed: obj.completed };
+      const parsed = JSON.parse(raw);
+      return {
+        forward: (parsed.forward && parsed.forward.completed && parsed.forward.completed.length === levels.length)
+          ? parsed.forward
+          : emptyProgress(),
+        reverse: (parsed.reverse && parsed.reverse.completed && parsed.reverse.completed.length === levels.length)
+          ? parsed.reverse
+          : emptyProgress(),
+      };
     } catch(e) {
-      return { completed: new Array(levels.length).fill(false) };
+      return { forward: emptyProgress(), reverse: emptyProgress() };
     }
   }
   function saveProgress() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: progress.completed })); }
-    catch(e) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        forward: progress.forward,
+        reverse: progress.reverse,
+      }));
+    } catch(e) {}
   }
   let progress = loadProgress();
-  function isCompleted(idx) { return !!progress.completed[idx]; }
-  function markCompleted(idx) { progress.completed[idx] = true; saveProgress(); }
+  function isCompleted(idx) { return !!progress[direction].completed[idx]; }
+  function markCompleted(idx) { progress[direction].completed[idx] = true; saveProgress(); }
 
   // 弹出关卡选择器
   const levelPickerBtn = document.getElementById('levelPickerBtn');
@@ -953,11 +1025,37 @@
     if (e.target === levelModal) closeLevelModal();
   });
   resetProgressBtn.addEventListener('click', () => {
-    if (!confirm('确定要清空所有通关记录吗？')) return;
-    progress = { completed: new Array(levels.length).fill(false) };
+    const label = direction === 'reverse' ? '倒序' : '顺序';
+    if (!confirm(`确定要清空【${label}】方向的所有通关记录吗？`)) return;
+    progress[direction] = emptyProgress();
     saveProgress();
     openLevelModal();  // 刷新网格显示
   });
+
+  // ============ 顺序 / 倒序 tab 切换 ============
+  const dirTabs = document.getElementById('dirTabs');
+  dirTabs.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newDir = btn.dataset.dir;
+      if (newDir === direction) return;  // 没变就不动
+      switchDirection(newDir);
+    });
+  });
+  function switchDirection(newDir) {
+    direction = newDir;
+    levels = buildLevels(newDir);
+    dirTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.dir === newDir));
+    // 如果 modal 开着，刷新网格
+    if (levelModal.classList.contains('show')) {
+      openLevelModal();
+    }
+    // 重新从头玩（不同方向的进度独立，从第 1 关起）
+    levelIdx = 0;
+    expectedIdx = 0;
+    filledCount = 0;
+    setupLevel();
+    enterTrain();
+  }
 
   // 跳转到指定关卡
   function jumpToLevel(idx) {
@@ -1077,9 +1175,9 @@
       </div>
     `;
 
-    // 字母池：需要的 + 干扰项
+    // 字母池：需要的 + 干扰项（拼字最多 3 节，干扰项保持 2 个；拼字只有 2 节时池子只 4 个）
     const needed = lv.toAdd;
-    const distractorCount = 2;
+    const distractorCount = needed.length === 3 ? 2 : (needed.length === 2 ? 2 : 1);
     const distractors = pickDistractors(needed, distractorCount);
     const allLetters = shuffle([...needed, ...distractors]);
     allLetters.forEach(letter => {
@@ -1213,8 +1311,8 @@
   }
 
   function updateProgress() {
-    // 每关共 4 节，车头固定算 1 节，filledCount 是已经拼上的 0~3
-    const total = 4;
+    // 每关总节数 = 1 (车头) + toAdd 长度；顺阶多 3 节，倒阶最后一关 2 节
+    const total = 1 + levels[levelIdx].toAdd.length;
     const filled = 1 + filledCount;
     progressEl.textContent = Array(total).fill('□').map((_, i) => i < filled ? '■' : '□').join('');
   }
@@ -1667,12 +1765,18 @@
     pool.style.opacity = '0';
     pool.style.transition = 'opacity 0.5s';
     hint.classList.add('success');
-    hint.innerHTML = '🎉 A B C D ... Z！字母火车出发啦！';
-    setTimeout(() => speakFinale('太棒啦！二十六个字母全部拼好啦！字母火车出发！'), 500);
+    hint.innerHTML = (direction === 'reverse')
+      ? '🎉 Z Y X ... A！字母火车倒着出发啦！'
+      : '🎉 A B C D ... Z！字母火车出发啦！';
+    setTimeout(() => speakFinale(direction === 'reverse'
+      ? '太棒啦！倒序的二十六个字母全部拼好啦！字母火车倒着出发！'
+      : '太棒啦！二十六个字母全部拼好啦！字母火车出发！'), 500);
     levelBadge.style.opacity = '0';
-    // 构建 26 节全字母火车
+    // 构建全字母火车（顺序 A→Z；倒序 Z→A，孩子看到的是从 A 走到 Z 或从 Z 走到 A 的样子）
     train.innerHTML = '';
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const letters = (direction === 'reverse')
+      ? 'ZYXWVUTSRQPONMLKJIHGFEDCBA'.split('')
+      : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     letters.forEach((letter, i) => {
       const car = document.createElement('div');
       if (i === 0) {
