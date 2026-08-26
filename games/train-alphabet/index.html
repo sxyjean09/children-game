@@ -892,15 +892,15 @@
 
   // ============ 关卡数据 ============
   // 每个 level 是 { head: 车头字母, toAdd: [需要新拼上去的字母序列] }
-  // 顺序：关 1 车头 A，要拼 B、C、D；关 2 车头 B，要拼 C、D、E；... → W
-  // 倒序：关 1 车头 Y，要拼 X、W、V；关 2 车头 X，要拼 W、V、U；... → D
-  // 两边都是 23 关（为了关数对称，倒序最后两关 toAdd 缩到 2/1 节，不越界）
+  // 顺序：关 1 车头 A，要拼 B、C、D；关 2 车头 B，要拼 C、D、E；... → W（最后一关 toAdd=[X,Y,Z]）
+  // 倒序：关 1 车头 Z，要拼 Y、X、W；关 2 车头 Y，要拼 X、W、V；... → D（最后一关 toAdd=[C,B,A]）
+  // 两边都是 23 关，每关固定 3 节，全部通关时车上 26 节，顺序 A→Z、倒序 Z→A
   function buildLevels(direction) {
     const levels = [];
     if (direction === 'reverse') {
-      // 倒序：车头从 Y 开始递减
+      // 倒序：车头从 Z 开始递减 23 个（D 是最后一关的起点），最后一关 toAdd=[C,B,A] 不越界
       for (let i = 0; i < 23; i++) {
-        const head = String.fromCharCode('Y'.charCodeAt(0) - i);
+        const head = String.fromCharCode('Z'.charCodeAt(0) - i);
         const allNext = [];
         for (let k = 1; k <= 3; k++) {
           const c = String.fromCharCode(head.charCodeAt(0) - k);
@@ -910,7 +910,7 @@
         levels.push({ head, toAdd: allNext });
       }
     } else {
-      // 顺序：车头从 A 开始递增
+      // 顺序：车头从 A 开始递增 23 个（W 是最后一关的起点），最后一关 toAdd=[X,Y,Z] 不越界
       for (let i = 0; i < 23; i++) {
         const head = String.fromCharCode('A'.charCodeAt(0) + i);
         const allNext = [];
