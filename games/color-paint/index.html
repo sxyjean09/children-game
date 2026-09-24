@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>认颜色 · 填涂小车</title>
+  <style>
+    /* ============== 基础 ============== */
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; height: 100%; width: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+      background: linear-gradient(180deg, #E3F2FD 0%, #FFF8E1 100%);
+      color: #4A3A20;
+      user-select: none; -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    /* ============== 游戏主界面 ============== */
+    #game {
+      position: absolute; inset: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部 */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+    }
+    .home-btn {
+      width: 80px; height: 60px; border: none; border-radius: 16px;
+      background: #fff; color: #E67E22;
+      font-size: 28px; font-weight: bold;
+      box-shadow: 0 4px 0 #E0CDA8;
+      cursor: pointer;
+    }
+    .home-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #E0CDA8; }
+    .progress {
+      font-size: 24px; color: #8B6F47;
+      background: #fff; padding: 8px 20px; border-radius: 30px;
+      box-shadow: 0 4px 0 #E0CDA8;
+      font-weight: bold;
+    }
+
+    /* 题目区 */
+    .quiz-area {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-around;
+      padding: 8px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 题目：颜色大圆 */
+    .color-prompt {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+    }
+    .color-circle {
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: #fff;
+      border: 6px solid #fff;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.1), 0 12px 20px rgba(0,0,0,0.15);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.3s;
+    }
+    .color-circle.bounce { animation: big-bounce 0.5s ease; }
+    @keyframes big-bounce {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.15); }
+    }
+    .color-circle.shake { animation: shake 0.4s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25%      { transform: translateX(-10px); }
+      75%      { transform: translateX(10px); }
+    }
+    .prompt-label {
+      font-size: 22px; color: #5D4037; font-weight: bold;
+    }
+
+    /* 小车舞台 */
+    .stage {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      height: 200px;
+    }
+    .road {
+      position: absolute;
+      bottom: 30px; left: 0; right: 0;
+      height: 30px;
+      background: #455A64;
+      border-radius: 8px;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2);
+    }
+    .road::after {
+      content: "";
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #FFC107 0 20px, transparent 20px 40px);
+      transform: translateY(-50%);
+    }
+    .car-wrap {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      /* 完全不用 CSS transition，全程由 JS animate() 控制 */
+    }
+    /* 从左边开回来的过渡 */
+    /* 开走时车身轻微描摆 */
+    .car-wrap.is-driving .car-body {
+      animation: car-wobble 0.3s ease-in-out infinite;
+    }
+    @keyframes car-wobble {
+      0%, 100% { transform: rotate(-1deg); }
+      50%      { transform: rotate(1deg); }
+    }
+
+    /* 轮子滚动动画 */
+    .wheel.spin {
+      animation: wheel-spin 0.3s linear infinite;
+    }
+    @keyframes wheel-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 尾灯闪 */
+    .taillight {
+      position: absolute;
+      bottom: 22px; left: 6px;
+      width: 10px; height: 10px;
+      background: #D32F2F;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #FF5252;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .car-wrap.is-driving .taillight {
+      opacity: 1;
+      animation: tail-blink 0.3s linear infinite;
+    }
+    @keyframes tail-blink {
+      0%, 100% { opacity: 0.4; box-shadow: 0 0 4px #FF5252; }
+      50%      { opacity: 1;   box-shadow: 0 0 10px #FF1744; }
+    }
+
+    /* 排气烟雾 */
+    .exhaust {
+      position: absolute;
+      bottom: 30px; left: -8px;
+      width: 14px; height: 14px;
+      background: rgba(180, 180, 180, 0.5);
+      border-radius: 50%;
+      opacity: 0;
+    }
+    .car-wrap.is-driving .exhaust {
+      opacity: 0.9;
+      animation: exhaust-puff 0.5s ease-out infinite;
+    }
+    @keyframes exhaust-puff {
+      0%   { transform: translate(0,0) scale(0.6); opacity: 0.9; }
+      100% { transform: translate(-30px, -10px) scale(1.6); opacity: 0; }
+    }
+    .car-body {
+      width: 180px; height: 110px;
+      position: relative;
+    }
+    /* 各车型在 .car-base 上设不同背景
+       涂色使用 --paint-color CSS 变量 */
+    .car-body .body-main {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 180px; height: 60px;
+      background: #ECEFF1;
+      border: 4px solid #455A64;
+      transition: background 0.5s;
+    }
+    /* 轿车：圆肩车顶 */
+    .car-body.sedan .body-main {
+      border-radius: 16px 16px 8px 8px;
+    }
+    .car-body.sedan .cabin {
+      position: absolute;
+      bottom: 50px; left: 30px;
+      width: 110px; height: 50px;
+      background: #B0BEC5;
+      border-radius: 20px 20px 0 0;
+      border: 4px solid #455A64;
+      border-bottom: none;
+    }
+    /* 消防车：方肩车身 + 车顶云梯 */
+    .car-body.fire .body-main {
+      border-radius: 12px;
+    }
+    .car-body.fire .cabin {
+      position: absolute;
+      bottom: 50px; left: 22px;
+      width: 120px; height: 48px;
+      background: #B0BEC5;
+      border-radius: 18px 18px 0 0;
+      border: 4px solid #455A64;
+      border-bottom: none;
+    }
+    .car-body.fire .ladder {
+      position: absolute;
+      bottom: 100px; left: 30px;
+      width: 140px; height: 8px;
+      background: #CFD8DC;
+      border: 2px solid #455A64;
+      border-radius: 3px;
+    }
+    .car-body.fire .ladder::before,
+    .car-body.fire .ladder::after {
+      content:""; position:absolute;
+      width: 2px; height: 12px; background: #455A64;
+      top: -10px;
+    }
+    .car-body.fire .ladder::before { left: 18px; }
+    .car-body.fire .ladder::after  { left: 122px; }
+
+    /* 警车：可涂色车身 + 独立黑色腰带元素 */
+    .car-body.police .body-main {
+      border-radius: 16px 16px 8px 8px;
+    }
+    .car-body.police .belt {
+      position: absolute;
+      bottom: 16px; left: 8px;
+      width: 164px; height: 12px;
+      background: #37474F;
+      border: 3px solid #455A64;
+      border-radius: 2px;
+    }
+    .car-body.police .cabin {
+      position: absolute;
+      bottom: 50px; left: 30px;
+      width: 110px; height: 50px;
+      background: #B0BEC5;
+      border-radius: 20px 20px 0 0;
+      border: 4px solid #455A64;
+      border-bottom: none;
+    }
+    .car-body.police .siren {
+      position: absolute;
+      bottom: 102px; left: 64px;
+      width: 44px; height: 12px;
+      background: linear-gradient(90deg, #1976D2 50%, #D32F2F 50%);
+      border: 2px solid #455A64;
+      border-radius: 4px;
+      box-shadow: 0 0 6px rgba(25,118,210,0.6);
+      animation: siren-blink 0.5s linear infinite;
+    }
+    @keyframes siren-blink {
+      0%, 100% { filter: brightness(1); }
+      50%      { filter: brightness(1.5); }
+    }
+    @keyframes siren-blink {
+      0%, 100% { background: linear-gradient(90deg, #1976D2 50%, #D32F2F 50%); }
+      50%      { background: linear-gradient(90deg, #64B5F6 50%, #EF5350 50%); }
+    }
+
+    /* 挖掘机：车体 + 长机械臂 + 铲斗 */
+    .car-body.excavator .body-main {
+      width: 110px; height: 50px;
+      left: 0;
+      border-radius: 8px;
+    }
+    .car-body.excavator .cabin {
+      position: absolute;
+      bottom: 42px; left: 14px;
+      width: 50px; height: 38px;
+      background: #B0BEC5;
+      border: 4px solid #455A64;
+      border-radius: 6px 6px 0 0;
+      border-bottom: none;
+    }
+    .car-body.excavator .arm-1 {
+      position: absolute;
+      bottom: 38px; left: 56px;
+      width: 50px; height: 10px;
+      background: #FFD54F;
+      border: 3px solid #455A64;
+      border-radius: 4px;
+      transform-origin: left center;
+      transform: rotate(-15deg);
+    }
+    .car-body.excavator .arm-2 {
+      position: absolute;
+      bottom: 68px; left: 100px;
+      width: 40px; height: 10px;
+      background: #FFD54F;
+      border: 3px solid #455A64;
+      border-radius: 4px;
+      transform-origin: left center;
+      transform: rotate(55deg);
+    }
+    .car-body.excavator .bucket {
+      position: absolute;
+      bottom: 52px; left: 138px;
+      width: 26px; height: 18px;
+      background: #FFD54F;
+      border: 3px solid #455A64;
+      border-radius: 4px 4px 8px 4px;
+    }
+    /* 出租车：型同轿车，加 TAXI 顶灯 */
+    .car-body.taxi .body-main {
+      border-radius: 16px 16px 8px 8px;
+    }
+    .car-body.taxi .cabin {
+      position: absolute;
+      bottom: 50px; left: 30px;
+      width: 110px; height: 50px;
+      background: #B0BEC5;
+      border-radius: 20px 20px 0 0;
+      border: 4px solid #455A64;
+      border-bottom: none;
+    }
+    .car-body.taxi .taxi-sign {
+      position: absolute;
+      bottom: 102px; left: 78px;
+      width: 26px; height: 12px;
+      background: #FFC107;
+      border: 2px solid #455A64;
+      border-radius: 4px;
+      box-shadow: 0 0 6px #FFEB3B;
+    }
+    /* 跑车被替换为更柔的车型 */
+    /* 巴士：高长方形 */
+    .car-body.bus .body-main {
+      width: 180px; height: 90px;
+      border-radius: 12px;
+    }
+    .car-body.bus .cabin {
+      position: absolute;
+      bottom: 80px; left: 0;
+      width: 180px; height: 18px;
+      background: #B0BEC5;
+      border: 4px solid #455A64;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+    }
+    .car-body.bus .window-row {
+      position: absolute;
+      bottom: 36px; left: 10px;
+      width: 160px; height: 36px;
+      background: rgba(255,255,255,0.7);
+      border: 4px solid #455A64;
+      border-radius: 6px;
+    }
+    .car-body.bus .window-row::before,
+    .car-body.bus .window-row::after {
+      content:""; position:absolute;
+      background:#455A64;
+      top: 0; bottom: 0; width: 1px;
+    }
+    .car-body.bus .window-row::before { left: 50%; }
+    .car-body.bus .window-row::after  { left: 75%; }
+
+    .car-window {
+      position: absolute;
+      top: 6px; left: 8px; right: 8px;
+      height: 28px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 6px 6px 0 0;
+    }
+    .wheel {
+      position: absolute;
+      bottom: -10px;
+      width: 30px; height: 30px;
+      background: #212121;
+      border-radius: 50%;
+      border: 4px solid #424242;
+    }
+    .wheel.fl { left: 14px; }
+    .wheel.fr { right: 14px; }
+    /* 巴士两轴 */
+    .car-body.bus .wheel.bl { left: 18px; }
+    .car-body.bus .wheel.br { right: 18px; }
+    /* 挖掘机：履带车 */
+    .car-body.excavator .wheel.fl { left: 18px; }
+    .car-body.excavator .wheel.fr { right: 18px; }
+    .headlight {
+      position: absolute;
+      bottom: 22px; right: 6px;
+      width: 12px; height: 12px;
+      background: #FFF59D;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #FFF59D;
+    }
+
+/* 挖掘机需要更宽 */
+    .car-body.excavator {
+      width: 200px;
+    }
+
+    /* 涂色：作用于车身主体 + 车舱 */
+    .car-body.painted .body-main,
+    .car-body.painted .cabin {
+      background: var(--paint-color, #ECEFF1) !important;
+    }
+
+    /* 颜料飞溅 */
+    .splash {
+      position: absolute;
+      pointer-events: none;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      opacity: 0;
+      animation: splash-anim 0.6s ease-out forwards;
+    }
+    @keyframes splash-anim {
+      0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
+    }
+
+    /* 选项区 */
+    .options {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 16px;
+    }
+    .opt-btn {
+      min-width: 110px; height: 90px;
+      padding: 0 16px;
+      border: 5px solid #5D4037;
+      border-radius: 22px;
+      background: #fff;
+      color: #5D4037;
+      font-size: 44px; font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #5D4037, 0 10px 16px rgba(0,0,0,0.1);
+      transition: transform 0.08s, box-shadow 0.08s;
+      font-family: inherit;
+    }
+    .opt-btn:active:not(:disabled) {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #5D4037, 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .opt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .opt-btn.right-flash {
+      background: #66BB6A; color: #fff; border-color: #2E7D32;
+      box-shadow: 0 6px 0 #2E7D32, 0 10px 16px rgba(0,0,0,0.15);
+    }
+    .opt-btn.wrong-flash {
+      background: #EF9A9A; color: #fff; border-color: #C62828;
+      animation: btn-shake 0.3s;
+    }
+    @keyframes btn-shake {
+      0%, 100% { transform: translateX(0); }
+      25%      { transform: translateX(-6px); }
+      75%      { transform: translateX(6px); }
+    }
+
+    /* 撒花 */
+    .confetti {
+      position: fixed;
+      top: -20px;
+      width: 16px; height: 16px;
+      pointer-events: none;
+      z-index: 200;
+      animation: fall 2.5s linear forwards;
+    }
+    @keyframes fall {
+      to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+    }
+
+    /* 完成 */
+    #done {
+      position: absolute; inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(255,248,224,0.96);
+      z-index: 50;
+    }
+    #done h1 { font-size: 56px; margin: 0 0 16px; color: #E65100; }
+    #done p { font-size: 24px; color: #5D4037; margin: 0 0 32px; }
+    #done button {
+      padding: 16px 36px; border: none; border-radius: 30px;
+      background: #FF8F00; color: #fff;
+      font-size: 24px; font-weight: bold;
+      box-shadow: 0 6px 0 #E65100;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #done button:active { transform: translateY(3px); box-shadow: 0 3px 0 #E65100; }
+
+    @media (max-height: 600px) {
+      .color-circle { width: 120px; height: 120px; }
+      .car-body { width: 140px; height: 90px; }
+      .car-base { width: 140px; height: 50px; }
+      .car-top { bottom: 42px; left: 24px; width: 86px; height: 40px; }
+      .stage { height: 160px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================== 游戏 ================== -->
+<div id="game">
+  <div class="top-bar">
+    <button class="home-btn" id="homeBtn">🏠<br/>回家</button>
+    <div class="progress" id="progress">第 1 关</div>
+    <div style="width:80px"></div>
+  </div>
+
+  <div class="quiz-area">
+    <!-- 题目：颜色圆 -->
+    <div class="color-prompt">
+      <div class="color-circle" id="colorCircle"></div>
+      <div class="prompt-label">这是 什么 颜色？</div>
+    </div>
+
+    <!-- 小车舞台 -->
+    <div class="stage" id="stage">
+      <div class="road"></div>
+      <div class="car-wrap" id="carWrap">
+        <div class="car-body sedan" id="carBody">
+          <!-- JS 根据车型动态填充 -->
+          <div class="body-main"></div>
+          <div class="cabin"><div class="car-window"></div></div>
+          <div class="taillight"></div>
+          <div class="headlight"></div>
+          <div class="exhaust"></div>
+          <div class="wheel fl"></div>
+          <div class="wheel fr"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选项 -->
+  <div class="options" id="options"></div>
+</div>
+
+<!-- ================== 完成 ================== -->
+<div id="done">
+  <h1>🎉 太棒啦！</h1>
+  <p>所有小车都涂好颜色开走啦！</p>
+  <button id="restartBtn">再玩一次</button>
+</div>
+
+<script>
+/* ================== 颜色库 ================== */
+const COLORS = [
+  { name: '红色', hex: '#E53935' },
+  { name: '橙色', hex: '#FB8C00' },
+  { name: '黄色', hex: '#FDD835' },
+  { name: '绿色', hex: '#43A047' },
+  { name: '蓝色', hex: '#1E88E5' },
+  { name: '紫色', hex: '#8E24AA' },
+  { name: '粉色', hex: '#EC407A' },
+  { name: '棕色', hex: '#795548' },
+  { name: '黑色', hex: '#37474F' },
+  { name: '白色', hex: '#ECEFF1' },
+];
+
+// 固定 10 种颜色顺序（每次开局打乱）
+const POOL = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+// 7 种车型模板
+const CAR_TYPES = [
+  { type: 'sedan',     name: '轿车',     wheels: 2 },
+  { type: 'taxi',      name: '出租车',   wheels: 2 },
+  { type: 'bus',       name: '巴士',     wheels: 2 },
+  { type: 'fire',      name: '消防车',   wheels: 2 },
+  { type: 'police',    name: '警车',     wheels: 2 },
+  
+  { type: 'excavator', name: '挖掘机',   wheels: 2 },
+];
+
+let pool = [];          // 当前关用色（已打乱）
+let roundIdx = 0;       // 当前第几关（从 0 开始）
+let correctCount = 0;   // 已答对数
+let answered = false;   // 当前题是否已答
+let audioReady = false;
+// 车型调度：保证 10 关内每种车型至少出现一次
+let carOrder = [];      // 当前 10 关的车型顺序（前 7 关 7 种不重复，后 3 关随机补）
+
+/* ================== TTS（语音） ================== */
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN';
+    u.rate = 0.9;
+    u.pitch = 1.1;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* noop */ }
+}
+
+function unlockAudio() {
+  if (audioReady) return;
+  audioReady = true;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.lang = 'zh-CN';
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('click', unlockAudio, { once: true });
+
+/* ================== 工具 ================== */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickN(arr, n) {
+  return shuffle(arr).slice(0, n);
+}
+
+/* ================== 开始 / 重玩（每次重新打乱顺序） ================== */
+function startGame() {
+  // 每次开局都重新打乱顺序
+  pool = shuffle(POOL);
+  roundIdx = 0;
+  correctCount = 0;
+  // 10 关车型顺序：shuffle([0..CAR_TYPES.length-1]) 前 N 个保证不重复 + 后几个随机补足到 10
+  carOrder = shuffle([...Array(CAR_TYPES.length).keys()]);
+  while (carOrder.length < pool.length) {
+    carOrder.push(Math.floor(Math.random() * CAR_TYPES.length));
+  }
+  document.getElementById('done').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  nextRound({ firstRound: true });
+}
+
+function backToLobby() {
+  // 回家：跳到 children-game 大厅
+  window.location.href = '../index.html';
+}
+
+document.getElementById('homeBtn').addEventListener('click', backToLobby);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+
+/* ================== 出题 ================== */
+function nextRound(opts) {
+  opts = opts || {};
+  const firstRound = !!opts.firstRound;
+  answered = false;
+  if (roundIdx >= pool.length) {
+    showDone();
+    return;
+  }
+
+  const targetColor = COLORS[pool[roundIdx]];
+  const colorCircle = document.getElementById('colorCircle');
+  const progressEl = document.getElementById('progress');
+
+  // 重置小车动画 + 车身颜色
+  const carWrap = document.getElementById('carWrap');
+  const carBody = document.getElementById('carBody');
+  carWrap.classList.remove('is-driving');
+  carBody.classList.remove('painted');
+  carBody.querySelectorAll('.wheel').forEach(w => w.classList.remove('spin'));
+  carBody.style.removeProperty('--paint-color');
+
+  // 随机抽车型 + 重新填充 DOM
+  renderCar(carBody);
+
+  const stage = document.getElementById('stage');
+  const stageW = stage.clientWidth;
+  const center = stageW / 2;
+
+  if (firstRound) {
+    // 首屏：车直接在中央（取消任何未完成动画）
+    if (carWrap._anim) { try { carWrap._anim.cancel(); } catch(e){} }
+    carWrap.style.transform = 'translateX(-50%)';
+    returnToQuestion(targetColor, colorCircle, progressEl, carWrap);
+    return;
+  }
+
+  // 其他关：车从左边开回来到中央（用 WAAPI animate()）
+  // 先取消未完的动画
+  if (carWrap._anim) { try { carWrap._anim.cancel(); } catch(e){} }
+  // startX 是相对中央的偏移（负 = 左）
+  const startX = -stageW * 0.3;
+  // 起点：左侧（使用 calc 保留居中基准）
+  carWrap.style.transform = `translateX(calc(-50% + ${startX}px))`;
+  // 启动动画到中央
+  const anim = carWrap.animate(
+    [
+      { transform: `translateX(calc(-50% + ${startX}px))` },
+      { transform: 'translateX(-50%)' },
+    ],
+    {
+      duration: 1800,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      fill: 'forwards',
+    }
+  );
+  carWrap._anim = anim;
+  carWrap.classList.add('is-driving');
+  carBody.querySelectorAll('.wheel').forEach(w => w.classList.add('spin'));
+  anim.onfinish = () => {
+    carWrap.style.transform = 'translateX(-50%)';
+    carWrap.classList.remove('is-driving');
+    carBody.querySelectorAll('.wheel').forEach(w => w.classList.remove('spin'));
+  };
+  returnToQuestion(targetColor, colorCircle, progressEl, carWrap);
+}
+
+function renderCar(carBody) {
+  // 从预洗牌的车型顺序里取，保证 10 关内 7 种车型全部出现
+  // 用 roundIdx 对齐：只有答对才进下一关，roundIdx 与车型推进严格同步
+  const typeIdx = carOrder[roundIdx % carOrder.length];
+  const carType = CAR_TYPES[typeIdx];
+  let html = '<div class="body-main"></div>';
+  if (carType.type === 'bus') {
+    html += '<div class="cabin"></div><div class="window-row"></div>';
+  } else if (carType.type === 'fire') {
+    html += '<div class="cabin"><div class="car-window"></div></div><div class="ladder"></div>';
+  } else if (carType.type === 'police') {
+    html += '<div class="cabin"><div class="car-window"></div></div><div class="belt"></div><div class="siren"></div>';
+  } else if (carType.type === 'excavator') {
+    html += '<div class="cabin"></div>';
+    html += '<div class="arm-1"></div><div class="arm-2"></div><div class="bucket"></div>';
+  } else if (carType.type === 'taxi') {
+    html += '<div class="cabin"><div class="car-window"></div></div><div class="taxi-sign"></div>';
+  } else {
+    html += '<div class="cabin"><div class="car-window"></div></div>';
+  }
+  html += '<div class="taillight"></div>';
+  html += '<div class="headlight"></div>';
+  html += '<div class="exhaust"></div>';
+  // 轮子
+  if (carType.type === 'bus') {
+    html += '<div class="wheel bl"></div><div class="wheel br"></div>';
+  } else if (carType.type === 'excavator') {
+    html += '<div class="wheel fl"></div><div class="wheel fr"></div>';
+  } else {
+    html += '<div class="wheel fl"></div><div class="wheel fr"></div>';
+  }
+  carBody.className = 'car-body ' + carType.type;
+  carBody.innerHTML = html;
+}
+
+function returnToQuestion(targetColor, colorCircle, progressEl, carWrap) {
+  progressEl.textContent = `第 ${roundIdx + 1} / ${pool.length} 关`;
+  colorCircle.style.background = targetColor.hex;
+
+  // 候选：target + 2 个干扰（从池内非 target 中取）
+  const poolOthers = COLORS.map((_, i) => i)
+    .filter(i => pool.includes(i) && i !== pool[roundIdx]);
+  const distractIdxs = pickN(poolOthers, 2);
+  const optIdxs = shuffle([pool[roundIdx], ...distractIdxs]);
+
+  // 渲染选项
+  const optionsEl = document.getElementById('options');
+  optionsEl.innerHTML = '';
+  optIdxs.forEach(idx => {
+    const c = COLORS[idx];
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = c.name;
+    btn.dataset.idx = idx;
+    btn.addEventListener('click', () => onPick(btn, idx === pool[roundIdx]));
+    optionsEl.appendChild(btn);
+  });
+
+  setTimeout(() => speak(`找${targetColor.name}`), 250);
+}
+
+/* ================== 答题 ================== */
+function onPick(btn, isRight) {
+  if (answered) return;
+  answered = true;
+  const targetColor = COLORS[pool[roundIdx]];
+
+  if (isRight) {
+    btn.classList.add('right-flash');
+    const colorCircle = document.getElementById('colorCircle');
+    colorCircle.classList.add('bounce');
+    speak(`对啦！${targetColor.name}`);
+
+    spawnSplashes(targetColor.hex);
+
+    // 涂色
+    setTimeout(() => {
+      const carBody = document.getElementById('carBody');
+      carBody.style.setProperty('--paint-color', targetColor.hex);
+      carBody.classList.add('painted');
+    }, 500);
+
+    // 开走：轮子转 + 滑到右边屏外（用 WAAPI animate()）
+    setTimeout(() => {
+      const carWrap = document.getElementById('carWrap');
+      const carBody = document.getElementById('carBody');
+      const stage = document.getElementById('stage');
+      const stageW = stage.clientWidth;
+      // endX 相对中央偏移（正 = 右），保证能滑出
+      const endX = stageW * 0.6 + 100;
+      // 取消上一个动画
+      if (carWrap._anim) { try { carWrap._anim.cancel(); } catch(e){} }
+      const anim = carWrap.animate(
+        [
+          { transform: 'translateX(-50%)' },
+          { transform: `translateX(calc(-50% + ${endX}px))` },
+        ],
+        {
+          duration: 2600,
+          easing: 'cubic-bezier(0.45, 0, 0.55, 1)',
+          fill: 'forwards',
+        }
+      );
+      carWrap._anim = anim;
+      carWrap.classList.add('is-driving');
+      carBody.querySelectorAll('.wheel').forEach(w => w.classList.add('spin'));
+      anim.onfinish = () => {
+        carWrap.style.transform = `translateX(calc(-50% + ${endX}px))`;
+        carWrap.classList.remove('is-driving');
+        carBody.querySelectorAll('.wheel').forEach(w => w.classList.remove('spin'));
+      };
+    }, 900);
+
+    // 进入下一关：nextRound 会重置小车 + 从左边开回来
+    setTimeout(() => {
+      correctCount++;
+      roundIdx++;
+      nextRound();
+    }, 3700);
+  } else {
+    btn.classList.add('wrong-flash');
+    document.getElementById('colorCircle').classList.add('shake');
+    speak(`不对哦，是${targetColor.name}`);
+    setTimeout(() => {
+      btn.classList.remove('wrong-flash');
+      colorCircle.classList.remove('shake');
+      answered = false;
+    }, 900);
+  }
+}
+
+/* ================== 颜料飞溅 ================== */
+function spawnSplashes(hex) {
+  const stage = document.getElementById('stage');
+  const rect = stage.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height - 90;
+  for (let i = 0; i < 12; i++) {
+    const s = document.createElement('div');
+    s.className = 'splash';
+    s.style.background = hex;
+    s.style.left = cx + 'px';
+    s.style.top = cy + 'px';
+    const angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.3;
+    const dist = 60 + Math.random() * 50;
+    s.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    s.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    stage.appendChild(s);
+    setTimeout(() => s.remove(), 700);
+  }
+}
+
+/* ================== 完成页 ================== */
+function showDone() {
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('done').style.display = 'flex';
+  speak('太棒啦！');
+  spawnConfetti();
+}
+
+function spawnConfetti() {
+  const colors = ['#E53935', '#FB8C00', '#FDD835', '#43A047', '#1E88E5', '#8E24AA', '#EC407A'];
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = (Math.random() * 100) + 'vw';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDelay = (Math.random() * 1.5) + 's';
+    c.style.animationDuration = (2 + Math.random() * 1.5) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4000);
+  }
+}
+
+/* ================== 启动 ================== */
+window.addEventListener('load', startGame);
+</script>
+</body>
+</html>
