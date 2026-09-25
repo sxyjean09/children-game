@@ -641,8 +641,8 @@ function startGame() {
 }
 
 function backToLobby() {
-  // 回家：跳到 children-game 大厅
-  window.location.href = '../index.html';
+  // 回家：跳到 children-game 大厅（games/color-paint → ../../）
+  window.location.href = '../../';
 }
 
 document.getElementById('homeBtn').addEventListener('click', backToLobby);
