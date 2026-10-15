@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#7BC47F">
+<title>城市小车 · 识字小游戏</title>
+<style>
+  /* ============== 基础 ============== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: #B8E6B9; touch-action: manipulation;
+  }
+  body { display: flex; flex-direction: column; }
+
+  /* ============== 顶部任务条 ============== */
+  .task-bar {
+    flex: 0 0 auto;
+    background: linear-gradient(180deg, #FFD56B 0%, #FFB347 100%);
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; min-height: 64px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    position: relative; z-index: 10;
+  }
+  .task-text {
+    font-size: 28px; font-weight: 900; color: #5B3A00;
+    text-align: center; line-height: 1.2;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.4);
+    transition: transform 0.2s;
+  }
+  .task-text.pop { animation: textPop 0.5s ease; }
+  @keyframes textPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+  .task-icon { font-size: 36px; line-height: 1; }
+  .replay-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    width: 48px; height: 48px; border-radius: 50%;
+    background: #fff; border: 3px solid #FF8C42;
+    font-size: 24px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.15);
+  }
+  .replay-btn:active { transform: translateY(calc(-50% + 2px)); box-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+
+  /* ============== 舞台 ============== */
+  .stage {
+    flex: 1 1 auto; position: relative; overflow: hidden;
+    background:
+      /* 草地斑块 */
+      radial-gradient(circle at 15% 25%, #A8DDA9 0 6%, transparent 7%),
+      radial-gradient(circle at 75% 60%, #A8DDA9 0 5%, transparent 6%),
+      radial-gradient(circle at 40% 85%, #A8DDA9 0 5%, transparent 6%),
+      linear-gradient(180deg, #B8E6B9 0%, #C8EFA8 100%);
+  }
+
+  /* ============== 道路（横+竖十字） ============== */
+  .road-h, .road-v {
+    position: absolute; background: #4A4A4A;
+  }
+  .road-h { left: 0; right: 0; height: 70px; }
+  .road-v { top: 0; bottom: 0; width: 70px; }
+  .road-h.top { top: 30%; }
+  .road-h.bottom { top: 70%; }
+  .road-v.left { left: 30%; }
+  .road-v.right { left: 70%; }
+  /* 黄色虚线 */
+  .road-h::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 4px; transform: translateY(-50%);
+    background-image: linear-gradient(90deg, #FFD93D 50%, transparent 50%);
+    background-size: 24px 4px; background-repeat: repeat-x;
+  }
+  .road-v::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 4px; transform: translateX(-50%);
+    background-image: linear-gradient(180deg, #FFD93D 50%, transparent 50%);
+    background-size: 4px 24px; background-repeat: repeat-y;
+  }
+  /* 人行道斑马线 */
+  .crosswalk {
+    position: absolute; background: #fff; opacity: 0.7;
+  }
+  .crosswalk.h {
+    height: 8px; width: 40px; left: 50%; transform: translateX(-50%);
+  }
+  .crosswalk.v {
+    width: 8px; height: 40px; top: 50%; transform: translateY(-50%);
+  }
+
+  /* ============== 红绿灯 ============== */
+  .traffic-light {
+    position: absolute; width: 36px; height: 80px;
+    background: #2C2C2C; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-around;
+    padding: 6px 0; z-index: 5;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+  }
+  .tl-light { width: 18px; height: 18px; border-radius: 50%; background: #555; transition: background 0.3s; }
+  .tl-light.red.on { background: #FF4444; box-shadow: 0 0 12px #FF4444; }
+  .tl-light.yellow.on { background: #FFD93D; box-shadow: 0 0 12px #FFD93D; }
+  .tl-light.green.on { background: #4CD964; box-shadow: 0 0 12px #4CD964; }
+
+  /* ============== 场景建筑 ============== */
+  .building {
+    position: absolute; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center;
+    transition: transform 0.2s;
+    z-index: 4;
+  }
+  .building:active { transform: scale(0.95); }
+  .building-icon {
+    font-size: 64px; line-height: 1;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+    transition: transform 0.3s;
+  }
+  .building-label {
+    margin-top: 4px; padding: 4px 12px;
+    background: #fff; border-radius: 16px;
+    font-size: 22px; font-weight: 900; color: #333;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+  /* 目标高亮：脉冲 + 光圈 */
+  .building.target {
+    animation: targetPulse 1s ease-in-out infinite;
+  }
+  .building.target .building-icon { transform: scale(1.1); }
+  .building.target::after {
+    content: ""; position: absolute; inset: -8px;
+    border: 4px dashed #FF6B6B; border-radius: 20px;
+    animation: spin 4s linear infinite;
+  }
+  @keyframes targetPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* ============== 小车库 ============== */
+  .garage {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, #6B8E5A 0%, #4A6B3A 100%);
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+    display: flex; justify-content: space-around; align-items: center;
+    box-shadow: 0 -4px 8px rgba(0,0,0,0.2);
+    z-index: 8;
+    min-height: 100px;
+  }
+  .car {
+    font-size: 44px; line-height: 1;
+    background: #fff; border-radius: 14px;
+    padding: 6px 8px; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+    transition: transform 0.15s;
+    position: relative;
+  }
+  .car:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+  .car.selected { background: #FFD93D; transform: translateY(-4px); }
+  .car.driving {
+    position: fixed; z-index: 20; transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+
+  /* ============== 大字浮现（认字） ============== */
+  .char-flash {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 280px; font-weight: 900; color: #FF6B6B;
+    text-shadow: 0 8px 0 #fff, 0 0 40px rgba(255,107,107,0.5);
+    z-index: 30; pointer-events: none;
+    animation: charFlash 1.5s ease-out forwards;
+  }
+  @keyframes charFlash {
+    0% { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 0; }
+    20% { transform: translate(-50%, -50%) scale(1.2) rotate(5deg); opacity: 1; }
+    35% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+    80% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5) rotate(0); opacity: 0; }
+  }
+
+  /* ============== 撒花 ============== */
+  .confetti {
+    position: fixed; width: 12px; height: 12px;
+    z-index: 25; pointer-events: none;
+    animation: confettiFall 1.5s ease-in forwards;
+  }
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0); opacity: 1; }
+    100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
+  }
+
+  /* ============== 错误反馈 ============== */
+  .error-flash {
+    position: fixed; inset: 0;
+    box-shadow: inset 0 0 0 12px #FF6B6B;
+    z-index: 15; pointer-events: none;
+    animation: errorShake 0.5s ease;
+  }
+  @keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+
+  /* ============== 成功撒花覆盖 ============== */
+  .success-overlay {
+    position: fixed; top: 30%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255,255,255,0.95);
+    padding: 24px 40px; border-radius: 32px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    z-index: 28; pointer-events: none;
+    animation: overlayPop 1.5s ease forwards;
+    text-align: center;
+  }
+  .success-overlay .big-char {
+    font-size: 100px; font-weight: 900; color: #FF6B6B;
+    line-height: 1;
+  }
+  .success-overlay .pinyin {
+    font-size: 28px; color: #888; margin-top: 4px;
+  }
+  .success-overlay .praise {
+    font-size: 32px; font-weight: 900; color: #FF8C42;
+    margin-top: 8px;
+  }
+  @keyframes overlayPop {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    20% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+  }
+
+  /* ============== 提示 / 介绍 ============== */
+  .intro {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .intro.hide { display: none; }
+  .intro-box {
+    background: #fff; border-radius: 24px; padding: 28px 24px;
+    text-align: center; max-width: 360px; width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .intro-box h1 { font-size: 32px; margin: 0 0 12px; color: #FF6B6B; }
+  .intro-box p { font-size: 20px; color: #555; margin: 8px 0; line-height: 1.5; }
+  .intro-box .cars-row { font-size: 40px; margin: 16px 0; }
+  .intro-btn {
+    margin-top: 16px;
+    background: linear-gradient(180deg, #FFD56B 0%, #FFB347 100%);
+    border: none; border-radius: 24px;
+    padding: 16px 40px; font-size: 28px; font-weight: 900;
+    color: #5B3A00; cursor: pointer;
+    box-shadow: 0 6px 0 #C77A00, 0 8px 12px rgba(0,0,0,0.2);
+  }
+  .intro-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #C77A00; }
+
+  /* ============== 响应式 ============== */
+  @media (orientation: portrait) {
+    .building-icon { font-size: 52px; }
+    .building-label { font-size: 18px; padding: 3px 10px; }
+    .task-text { font-size: 22px; }
+    .task-icon { font-size: 28px; }
+    .car { font-size: 36px; padding: 4px 6px; }
+    .char-flash { font-size: 200px; }
+  }
+  @media (max-width: 380px) {
+    .building-icon { font-size: 44px; }
+    .building-label { font-size: 16px; }
+    .car { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 任务条 -->
+<div class="task-bar">
+  <span class="task-icon" id="taskIcon">🚗</span>
+  <span class="task-text" id="taskText">点下面的车开始吧</span>
+  <button class="replay-btn" id="replayBtn" aria-label="再说一遍">🔊</button>
+</div>
+
+<!-- 舞台 -->
+<div class="stage" id="stage">
+  <!-- 道路 -->
+  <div class="road-h top"></div>
+  <div class="road-h bottom"></div>
+  <div class="road-v left"></div>
+  <div class="road-v right"></div>
+  <!-- 红绿灯 -->
+  <div class="traffic-light" id="trafficLight1" style="top: calc(30% - 40px); left: calc(30% - 44px);">
+    <div class="tl-light red"></div>
+    <div class="tl-light yellow"></div>
+    <div class="tl-light green on"></div>
+  </div>
+  <div class="traffic-light" id="trafficLight2" style="top: calc(70% - 40px); left: calc(70% - 44px);">
+    <div class="tl-light red on"></div>
+    <div class="tl-light yellow"></div>
+    <div class="tl-light green"></div>
+  </div>
+</div>
+
+<!-- 小车库 -->
+<div class="garage" id="garage"></div>
+
+<!-- 介绍弹窗 -->
+<div class="intro" id="intro">
+  <div class="intro-box">
+    <h1>🚗 城市小车</h1>
+    <p>把 <b>小车</b> 开到它该去的地方！</p>
+    <p>认识 <b>10 个字</b>，开开心心玩！</p>
+    <div class="cars-row">🚓 🚒 🚑 🚌 🚛 🚚 🍕 🚐 🚙 🚜</div>
+    <button class="intro-btn" id="startBtn">开始玩</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============== 数据 ============== */
+const SCENES = [
+  { id: "you",  char: "油", scene: "加油站",   icon: "⛽", car: "🚛", carName: "油罐车",  pos: { col: 0, row: 0 }, tts: "加油站的油" },
+  { id: "jing", char: "警", scene: "警察局",   icon: "🚓", car: "🚓", carName: "警车",    pos: { col: 2, row: 0 }, tts: "警察局的警" },
+  { id: "xue",  char: "学", scene: "学校",     icon: "🏫", car: "🚌", carName: "校车",    pos: { col: 1, row: 0 }, tts: "学校的学" },
+  { id: "yi",   char: "医", scene: "医院",     icon: "🏥", car: "🚑", carName: "救护车",  pos: { col: 0, row: 1 }, tts: "医院的医" },
+  { id: "xiao", char: "消", scene: "消防站",   icon: "🚒", car: "🚒", carName: "消防车",  pos: { col: 2, row: 1 }, tts: "消防站的消" },
+  { id: "you2", char: "邮", scene: "邮局",     icon: "🏤", car: "🚚", carName: "邮车",    pos: { col: 0, row: 2 }, tts: "邮局的邮" },
+  { id: "can",  char: "餐", scene: "餐厅",     icon: "🍽️", car: "🍕", carName: "外卖车",  pos: { col: 1, row: 2 }, tts: "餐厅的餐" },
+  { id: "yuan", char: "园", scene: "公园",     icon: "🌳", car: "🚐", carName: "观光车",  pos: { col: 2, row: 2 }, tts: "公园的园" },
+  { id: "shi",  char: "市", scene: "超市",     icon: "🛒", car: "🚙", carName: "购物车",  pos: { col: 0, row: 0 }, tts: "超市的市" },
+  { id: "gong", char: "工", scene: "工地",     icon: "🏗️", car: "🚜", carName: "工程车",  pos: { col: 1, row: 1 }, tts: "工地的工" },
+];
+
+// 同一格的冲突避免：shi 跟 you 都是 (0,0)，把 shi 改到 (0,2) 但 you2 也是 (0,2)，那 shi 改 (1,2) 跟 can 冲突。
+// 重新排版避免重叠：
+// 你可以重新整理 3x3 网格布局：
+const SCENES_LAYOUT = [
+  { col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 },
+  { col: 0, row: 1 }, { col: 1, row: 1 }, { col: 2, row: 1 },
+  { col: 0, row: 2 }, { col: 1, row: 2 }, { col: 2, row: 2 },
+  { col: 1, row: 0 }, // 第 10 个放在最上行中间
+];
+// 第 10 个 (gong) 放 (1,0)，但 xue 已经在 (1,0)  → 改 gong 放哪里
+// 改：让 gong 占 (1,0)，xue 改 (1,1)，yi 改 (0,1)，can 改 (1,2) — 都不冲突
+// 实际上简单点：让 10 个场景都不同格子，先确定一个 3x3 = 9 格 + 第 10 个重叠某个安全的
+// 反正有 9 个格子，10 个场景放不下，删一个？不行，10 个字是宇要的
+// 改方案：3 列 4 行更宽松，或让第 10 个浮在右下角
+// 简单做法：10 个场景均匀分布到 4 个象限（上下左右），不再严格 3x3
+
+// 我重新分配位置（按屏幕象限）：
+const SCENE_POSITIONS = {
+  you:  { x: 0.08, y: 0.08 },  // 左上
+  jing: { x: 0.50, y: 0.06 },  // 上中
+  xue:  { x: 0.90, y: 0.10 },  // 右上
+  yi:   { x: 0.06, y: 0.42 },  // 左中
+  xiao: { x: 0.92, y: 0.42 },  // 右中
+  you2: { x: 0.08, y: 0.78 },  // 左下
+  can:  { x: 0.50, y: 0.78 },  // 下中
+  yuan: { x: 0.92, y: 0.78 },  // 右下
+  shi:  { x: 0.32, y: 0.10 },  // 上左中
+  gong: { x: 0.68, y: 0.10 },  // 上右中
+};
+
+/* ============== 状态 ============== */
+const state = {
+  currentTarget: null,  // 当前任务场景
+  isAnimating: false,   // 小车在开动中
+  speakEnabled: false,  // TTS 是否可用
+};
+
+/* ============== 语音 ============== */
+let ttsReady = false;
+function initTTS() {
+  if (!("speechSynthesis" in window)) { ttsReady = false; return; }
+  // 等 voices 加载
+  if (speechSynthesis.getVoices().length === 0) {
+    speechSynthesis.addEventListener("voiceschanged", () => { ttsReady = true; });
+  } else {
+    ttsReady = true;
+  }
+}
+function speak(text) {
+  if (!ttsReady || !("speechSynthesis" in window)) return false;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "zh-CN";
+    u.rate = 0.85;
+    u.pitch = 1.15;
+    u.volume = 1;
+    // 选中文女声（如果有）
+    const voices = speechSynthesis.getVoices();
+    const cnVoice = voices.find(v => /zh|chinese|mandarin/i.test(v.lang + v.name));
+    if (cnVoice) u.voice = cnVoice;
+    speechSynthesis.speak(u);
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ============== 摇一摇 / 反馈 ============== */
+function vibrate(pattern) {
+  if ("vibrate" in navigator) {
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+}
+function showCharFlash(char) {
+  const el = document.createElement("div");
+  el.className = "char-flash";
+  el.textContent = char;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+function showSuccessOverlay(scene) {
+  const el = document.createElement("div");
+  el.className = "success-overlay";
+  el.innerHTML = `<div class="big-char">${scene.char}</div>
+                  <div class="praise">太棒啦！🎉</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+function showConfetti() {
+  const colors = ["#FF6B6B", "#FFD93D", "#4CD964", "#5AC8FA", "#FF8C42", "#AF52DE"];
+  for (let i = 0; i < 30; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random() * 100) + "vw";
+    c.style.top = "20vh";
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDelay = (Math.random() * 0.3) + "s";
+    c.style.transform = `rotate(${Math.random() * 360}deg)`;
+    if (Math.random() > 0.5) c.style.borderRadius = "50%";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 2000);
+  }
+}
+function showError() {
+  const el = document.createElement("div");
+  el.className = "error-flash";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 600);
+  vibrate([80, 50, 80]);
+}
+
+/* ============== 渲染 ============== */
+function renderBuildings() {
+  const stage = document.getElementById("stage");
+  SCENES.forEach(s => {
+    const pos = SCENE_POSITIONS[s.id];
+    const b = document.createElement("div");
+    b.className = "building";
+    b.dataset.id = s.id;
+    b.style.left = (pos.x * 100) + "%";
+    b.style.top = (pos.y * 100) + "%";
+    b.style.transform = "translate(-50%, -50%)";
+    b.innerHTML = `<div class="building-icon">${s.icon}</div>
+                   <div class="building-label">${s.scene}</div>`;
+    b.addEventListener("click", () => onBuildingTap(s));
+    stage.appendChild(b);
+  });
+}
+function renderGarage() {
+  const garage = document.getElementById("garage");
+  garage.innerHTML = "";
+  SCENES.forEach(s => {
+    const c = document.createElement("div");
+    c.className = "car";
+    c.dataset.id = s.id;
+    c.textContent = s.car;
+    c.title = s.carName;
+    c.addEventListener("click", () => onCarTap(s, c));
+    garage.appendChild(c);
+  });
+}
+
+/* ============== 任务系统 ============== */
+function pickNewTask() {
+  // 随机选一个未完成场景（避免连续重复）
+  const prev = state.currentTarget;
+  let next;
+  do { next = SCENES[Math.floor(Math.random() * SCENES.length)]; }
+  while (SCENES.length > 1 && next.id === prev?.id);
+  state.currentTarget = next;
+  showTask(next);
+}
+function showTask(scene) {
+  const icon = document.getElementById("taskIcon");
+  const text = document.getElementById("taskText");
+  icon.textContent = scene.car;
+  text.textContent = `请把${scene.carName}开到${scene.scene}`;
+  // 弹一下
+  text.classList.remove("pop");
+  void text.offsetWidth;
+  text.classList.add("pop");
+  // 高亮目标
+  document.querySelectorAll(".building").forEach(b => b.classList.remove("target"));
+  document.querySelector(`.building[data-id="${scene.id}"]`)?.classList.add("target");
+  // 朗读
+  if (!speak(`请把${scene.carName}，开到${scene.scene}`)) {
+    // TTS 不可用：文字会一直显示
+  }
+}
+
+/* ============== 交互 ============== */
+function onCarTap(scene, el) {
+  if (state.isAnimating) return;
+  // 选中
+  document.querySelectorAll(".car").forEach(c => c.classList.remove("selected"));
+  el.classList.add("selected");
+  // 提示音
+  if (!speak(`${scene.carName}要去${scene.scene}`)) {
+    // 视觉反馈：任务条更新
+    document.getElementById("taskText").textContent =
+      `${scene.car} ${scene.carName} → ${scene.scene}`;
+  }
+  vibrate(30);
+  // 准备开动：等用户点建筑
+  state.pendingCar = scene;
+  state.pendingEl = el;
+}
+
+function onBuildingTap(scene) {
+  if (state.isAnimating) return;
+  if (!state.pendingCar) {
+    // 没选车 → 提示
+    document.getElementById("taskText").textContent = "先点下面的车 🚗";
+    if (!speak("先点下面的车")) { /* 文字兜底 */ }
+    vibrate(50);
+    return;
+  }
+  if (state.pendingCar.id !== scene.id) {
+    // 错了
+    showError();
+    document.getElementById("taskText").textContent =
+      `不对哦，${state.pendingCar.carName}不是去${scene.scene}的，再想想～`;
+    if (!speak(`不对哦，再想想`)) { /* 文字兜底 */ }
+    return;
+  }
+  // 对了 → 开过去
+  driveCarTo(scene);
+}
+
+function driveCarTo(scene) {
+  state.isAnimating = true;
+  const carEl = state.pendingEl;
+  const target = document.querySelector(`.building[data-id="${scene.id}"]`);
+  if (!target) { state.isAnimating = false; return; }
+
+  // 取车库车的位置（屏幕坐标）
+  const carRect = carEl.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+
+  // 把车脱离车库，固定到 fixed
+  carEl.classList.add("driving");
+  carEl.style.left = carRect.left + "px";
+  carEl.style.top = carRect.top + "px";
+  carEl.style.width = carRect.width + "px";
+  carEl.style.height = carRect.height + "px";
+  // 移动到目标
+  const destX = targetRect.left + targetRect.width / 2 - carRect.width / 2;
+  const destY = targetRect.top + targetRect.height / 2 - carRect.height / 2;
+  // 等下一帧再改位置，触发 transition
+  requestAnimationFrame(() => {
+    carEl.style.left = destX + "px";
+    carEl.style.top = destY + "px";
+  });
+
+  // 1.4s 后判断
+  setTimeout(() => {
+    // 撒花 + 大字 + 念字
+    showConfetti();
+    showCharFlash(scene.char);
+    showSuccessOverlay(scene);
+    vibrate([50, 30, 80, 30, 100]);
+    speak(`${scene.char}！${scene.carName}到${scene.scene}啦！太棒啦！`);
+
+    // 收回车
+    setTimeout(() => {
+      carEl.classList.remove("driving", "selected");
+      carEl.style.left = "";
+      carEl.style.top = "";
+      carEl.style.width = "";
+      carEl.style.height = "";
+      state.isAnimating = false;
+      state.pendingCar = null;
+      state.pendingEl = null;
+      // 取消高亮
+      document.querySelectorAll(".building").forEach(b => b.classList.remove("target"));
+      // 下一关
+      setTimeout(pickNewTask, 600);
+    }, 1500);
+  }, 1300);
+}
+
+/* ============== 红绿灯 ============== */
+function startTrafficLights() {
+  const tl1 = document.getElementById("trafficLight1");
+  const tl2 = document.getElementById("trafficLight2");
+  const lights1 = tl1.querySelectorAll(".tl-light");
+  const lights2 = tl2.querySelectorAll(".tl-light");
+  let phase = 0;
+  setInterval(() => {
+    phase = (phase + 1) % 3;
+    // 重置
+    lights1.forEach(l => l.classList.remove("on"));
+    lights2.forEach(l => l.classList.remove("on"));
+    if (phase === 0) {
+      lights1[2].classList.add("on"); // tl1 绿
+      lights2[0].classList.add("on"); // tl2 红
+    } else if (phase === 1) {
+      lights1[1].classList.add("on"); // tl1 黄
+      lights2[1].classList.add("on"); // tl2 黄
+    } else {
+      lights1[0].classList.add("on"); // tl1 红
+      lights2[2].classList.add("on"); // tl2 绿
+    }
+  }, 2500);
+}
+
+/* ============== 启动 ============== */
+document.getElementById("startBtn").addEventListener("click", () => {
+  document.getElementById("intro").classList.add("hide");
+  state.speakEnabled = true;
+  initTTS();
+  // 第一次要等 voices 加载完才能 speak
+  setTimeout(pickNewTask, 500);
+});
+document.getElementById("replayBtn").addEventListener("click", () => {
+  if (state.currentTarget) showTask(state.currentTarget);
+});
+
+// 一些车 / 建筑位置调试：响应窗口变化
+window.addEventListener("resize", () => {
+  // 简单：重新渲染建筑（位置是 %）
+});
+
+// 初始化
+renderBuildings();
+renderGarage();
+startTrafficLights();
+initTTS();
+
+// 调试：跳过介绍
+if (location.search.includes("skip")) {
+  document.getElementById("intro").classList.add("hide");
+  setTimeout(pickNewTask, 300);
+}
+</script>
+
+</body>
+</html>
