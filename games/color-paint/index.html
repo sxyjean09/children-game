@@ -37,6 +37,15 @@
       cursor: pointer;
     }
     .home-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #E0CDA8; }
+    /* 提示按钮：说一次颜色名（不告诉哪个选项对） */
+    .hint-btn {
+      width: 80px; height: 60px; border: none; border-radius: 16px;
+      background: #fff; color: #E67E22;
+      font-size: 28px; font-weight: bold;
+      box-shadow: 0 4px 0 #E0CDA8;
+      cursor: pointer;
+    }
+    .hint-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #E0CDA8; }
     .progress {
       font-size: 24px; color: #8B6F47;
       background: #fff; padding: 8px 20px; border-radius: 30px;
@@ -81,6 +90,19 @@
     }
     .prompt-label {
       font-size: 22px; color: #5D4037; font-weight: bold;
+    }
+
+    /* 提示字：点错两次后 / 点💡按钮时，把颜色词放大显示 */
+    .hint-word {
+      font-size: 64px; font-weight: 900; color: #E65100;
+      line-height: 1.1;
+      min-height: 72px;
+      opacity: 0; transform: scale(0.6);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+    .hint-word.show {
+      opacity: 1; transform: scale(1);
     }
 
     /* 小车舞台 */
@@ -445,6 +467,12 @@
       box-shadow: 0 2px 0 #5D4037, 0 4px 8px rgba(0,0,0,0.1);
     }
     .opt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* 新选项生成时的弹出动画（点错后换新选项用） */
+    .opt-btn.fresh { animation: opt-pop 0.25s ease-out; }
+    @keyframes opt-pop {
+      0%   { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
     .opt-btn.right-flash {
       background: #66BB6A; color: #fff; border-color: #2E7D32;
       box-shadow: 0 6px 0 #2E7D32, 0 10px 16px rgba(0,0,0,0.15);
@@ -495,6 +523,7 @@
 
     @media (max-height: 600px) {
       .color-circle { width: 120px; height: 120px; }
+      .hint-word { font-size: 48px; min-height: 54px; }
       .car-body { width: 140px; height: 90px; }
       .car-base { width: 140px; height: 50px; }
       .car-top { bottom: 42px; left: 24px; width: 86px; height: 40px; }
@@ -509,13 +538,14 @@
   <div class="top-bar">
     <button class="home-btn" id="homeBtn">🏠<br/>回家</button>
     <div class="progress" id="progress">第 1 关</div>
-    <div style="width:80px"></div>
+    <button class="hint-btn" id="hintBtn" aria-label="提示">💡</button>
   </div>
 
   <div class="quiz-area">
     <!-- 题目：颜色圆 -->
     <div class="color-prompt">
       <div class="color-circle" id="colorCircle"></div>
+      <div class="hint-word" id="hintWord"></div>
       <div class="prompt-label">这是 什么 颜色？</div>
     </div>
 
@@ -581,6 +611,8 @@ let pool = [];          // 当前关用色（已打乱）
 let roundIdx = 0;       // 当前第几关（从 0 开始）
 let correctCount = 0;   // 已答对数
 let answered = false;   // 当前题是否已答
+let wrongStreak = 0;    // 本关连续答错次数（连错 2 次才给大字提示）
+let usedDistractors = []; // 本关已经用过的干扰项（换选项时避免重复）
 let audioReady = false;
 // 车型调度：保证 10 关内每种车型至少出现一次
 let carOrder = [];      // 当前 10 关的车型顺序（前 7 关 7 种不重复，后 3 关随机补）
@@ -647,6 +679,11 @@ function backToLobby() {
 
 document.getElementById('homeBtn').addEventListener('click', backToLobby);
 document.getElementById('restartBtn').addEventListener('click', startGame);
+// 💡 提示按钮：只重复题目语音，不告诉答案
+document.getElementById('hintBtn').addEventListener('click', () => {
+  const targetColor = COLORS[pool[roundIdx]];
+  speak(`找${targetColor.name}`);
+});
 
 /* ================== 出题 ================== */
 function nextRound(opts) {
@@ -754,11 +791,41 @@ function returnToQuestion(targetColor, colorCircle, progressEl, carWrap) {
   progressEl.textContent = `第 ${roundIdx + 1} / ${pool.length} 关`;
   colorCircle.style.background = targetColor.hex;
 
-  // 候选：target + 2 个干扰（从池内非 target 中取）
+  // 新一关：清空提示字 + 答错记录
+  const hintWord = document.getElementById('hintWord');
+  hintWord.classList.remove('show');
+  hintWord.textContent = '';
+  wrongStreak = 0;
+  usedDistractors = [];
+
+  renderOptions();
+
+  setTimeout(() => speak(`找${targetColor.name}`), 250);
+}
+
+/* ================== 生成待选项 ================== */
+/**
+ * 每组待选项 = 正确答案 + 2 个干扰项。
+ * 关键：干扰项会随「点错」不断更换 —— 小朋友没法顺着点一遍试出答案，
+ * 只能真的记住「这个颜色」对应的是哪个字。
+ */
+function renderOptions(opts) {
+  opts = opts || {};
+  const targetIdx = pool[roundIdx];
+
+  // 干扰项优先从"本关还没用过"的颜色里挑；不够了就清空记录重新来
   const poolOthers = COLORS.map((_, i) => i)
-    .filter(i => pool.includes(i) && i !== pool[roundIdx]);
-  const distractIdxs = pickN(poolOthers, 2);
-  const optIdxs = shuffle([pool[roundIdx], ...distractIdxs]);
+    .filter(i => pool.includes(i) && i !== targetIdx && i !== opts.exclude);
+  let fresh = poolOthers.filter(i => !usedDistractors.includes(i));
+  if (fresh.length < 2) {
+    usedDistractors = [];
+    fresh = poolOthers;
+  }
+  const distractIdxs = pickN(fresh, 2);
+  usedDistractors = usedDistractors.concat(distractIdxs);
+
+  // 打乱位置，避免小朋友靠位置记忆
+  const optIdxs = shuffle([targetIdx, ...distractIdxs]);
 
   // 渲染选项
   const optionsEl = document.getElementById('options');
@@ -766,14 +833,12 @@ function returnToQuestion(targetColor, colorCircle, progressEl, carWrap) {
   optIdxs.forEach(idx => {
     const c = COLORS[idx];
     const btn = document.createElement('button');
-    btn.className = 'opt-btn';
+    btn.className = 'opt-btn' + (opts.fresh ? ' fresh' : '');
     btn.textContent = c.name;
     btn.dataset.idx = idx;
-    btn.addEventListener('click', () => onPick(btn, idx === pool[roundIdx]));
+    btn.addEventListener('click', () => onPick(btn, idx === targetIdx));
     optionsEl.appendChild(btn);
   });
-
-  setTimeout(() => speak(`找${targetColor.name}`), 250);
 }
 
 /* ================== 答题 ================== */
@@ -787,6 +852,10 @@ function onPick(btn, isRight) {
     const colorCircle = document.getElementById('colorCircle');
     colorCircle.classList.add('bounce');
     speak(`对啦！${targetColor.name}`);
+    // 收起提示字（答对了就不用再提示了）
+    const hintWordEl = document.getElementById('hintWord');
+    hintWordEl.classList.remove('show');
+    hintWordEl.textContent = '';
 
     spawnSplashes(targetColor.hex);
 
@@ -835,12 +904,33 @@ function onPick(btn, isRight) {
       nextRound();
     }, 3700);
   } else {
+    // 答错：不报答案（原来会说"是红色"，等于直接把答案告诉小朋友了）
+    wrongStreak++;
     btn.classList.add('wrong-flash');
-    document.getElementById('colorCircle').classList.add('shake');
-    speak(`不对哦，是${targetColor.name}`);
+    const colorCircle = document.getElementById('colorCircle');
+    colorCircle.classList.add('shake');
+    speak('再想想看～');
+
     setTimeout(() => {
       btn.classList.remove('wrong-flash');
       colorCircle.classList.remove('shake');
+
+      // ★ 核心改动：重新生成整组待选项（干扰项换新、位置也换新）
+      // 小朋友没法顺着点一遍试出答案，必须真的记住颜色对应的字
+      renderOptions({ fresh: true, exclude: parseInt(btn.dataset.idx, 10) });
+
+      // 连错 2 次才给"教学提示"：把正确的颜色词放大显示出来
+      // （这是教他认字，不是泄题）
+      if (wrongStreak >= 2) {
+        const hintWord = document.getElementById('hintWord');
+        hintWord.textContent = targetColor.name;
+        hintWord.classList.add('show');
+        setTimeout(() => speak(`看，是${targetColor.name}`), 400);
+      } else {
+        // 再念一遍题目，让他重新看一遍颜色
+        setTimeout(() => speak(`找${targetColor.name}`), 400);
+      }
+
       answered = false;
     }, 900);
   }
